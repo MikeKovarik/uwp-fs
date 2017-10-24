@@ -1,0 +1,17 @@
+{
+  "name": "uwp-fs",
+  "version": "1.0.0",
+  "description": "Node's 'fs' module for Windows UWP apps.",
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w"
+  },
+  "author": "Mike Kovařík",
+  "license": "MIT",
+  "dependencies": {
+    "node-web-streams-adapter": "latest"
+  },
+  "devDependencies": {
+    "rollup": "^0.50.0"
+  }
+}
