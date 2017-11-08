@@ -1,3 +1,3 @@
-import './src/uwp-fs.mjs'
-import def from './src/uwp-fs.mjs'
-export default def
+export * from './src/index.mjs'
+//import def from './src/index.mjs'
+//export default def

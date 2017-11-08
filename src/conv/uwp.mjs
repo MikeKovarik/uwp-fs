@@ -15,7 +15,7 @@ if (typeof Windows === 'object') {
 class UwpStreamSource extends UnderlyingSourceWrapper {
 
 	// Allocates enough space in newly created chunk buffer.
-	chunkAlloc(size) {
+	alloc(size) {
 		return new Uint8Array(size)
 	}
 
@@ -32,7 +32,7 @@ class UwpStreamSource extends UnderlyingSourceWrapper {
 		//
 		var bytesRead = await this.reader.loadAsync(desiredSize)
 		// Create Buffer of the size that we know is ready for use to read from the stream.
-		var chunk = this.chunkAlloc(bytesRead)
+		var chunk = this.alloc(bytesRead)
 		// Now read the data from the stream into the chunk buffe we've just created.
 		this.reader.readBytes(chunk)
 	}
@@ -47,7 +47,7 @@ class UwpStreamSource extends UnderlyingSourceWrapper {
 class UwpStreamSink extends UnderlyingSinkWrapper {
 
 	// Allocates enough space in newly created chunk buffer.
-	chunkAlloc(size) {
+	alloc(size) {
 		return new Uint8Array(size)
 	}
 
@@ -64,7 +64,7 @@ class UwpStreamSink extends UnderlyingSinkWrapper {
 		//
 		var bytesRead = await this.reader.loadAsync(desiredSize)
 		// Create Buffer of the size that we know is ready for use to read from the stream.
-		var chunk = this.chunkAlloc(bytesRead)
+		var chunk = this.alloc(bytesRead)
 		// Now read the data from the stream into the chunk buffe we've just created.
 		this.reader.readBytes(chunk)
 	}
@@ -78,13 +78,13 @@ class UwpStreamSink extends UnderlyingSinkWrapper {
 
 export function readableFromUwpStream(uwpStream = this, options = {}) {
 	var underlyingSource = new UwpStreamSource(uwpStream)
-	underlyingSource.chunkAlloc = size => Buffer.allocUnsafe(size)
+	underlyingSource.alloc = size => Buffer.allocUnsafe(size)
 	return new ReadableStreamAdapter(underlyingSource, options)
 }
 
 export function readableStreamFromUwpStream(uwpStream = this, options = {}) {
 	var underlyingSource = new UwpStreamSource(uwpStream)
-	underlyingSource.chunkAlloc = size => new Uint8Array(size)
+	underlyingSource.alloc = size => new Uint8Array(size)
 	return new ReadableStream(underlyingSource, options)
 }
 

@@ -1,63 +1,65 @@
-export var defaultFolder
+export var isUwp = typeof Windows !== 'undefined'
 
-if (typeof Windows !== 'undefined') {
-	var applicationData = Windows.Storage.ApplicationData.current
-	var localFolder = applicationData.localFolder
-	defaultFolder = localFolder
+export var readyPromises = []
+export var ready = new Promise(resolve => {
+	setTimeout(() => {
+		Promise.all(readyPromises).then(resolve)
+	})
+})
+
+export function wrapPromise(promise) {
+	return new Promise((resolve, reject) => promise.then(resolve, reject))
 }
 
-export function setFolder(newFolder) {
-	defaultFolder = newFolder
+// Strips drive name from path (creates path relative to the drive)
+export function stripDrive(path) {
+	var index
+	index = path.indexOf(':\\\\')
+	if ((index = path.indexOf(':\\\\')) !== -1)
+		path = path.substr(index + 3)
+	if ((index = path.indexOf(':\\')) !== -1)
+		path = path.substr(index + 2)
+	return path
 }
 
-export function getFolder(args) {
-	if (typeof args[0] !== 'string')
-		return args.shift()
-	else
-		return defaultFolder
+export function extractDrive(path) {
+	var index = path.indexOf(':')
+	return path.substr(index - 1, index).toLowerCase()
 }
 
 
-export async function accessUwpFolder(folder, path, ensure = false) {
-	if (path.includes('\\'))
-		path = path.replace(/\\/g, '/')
-	if (path.includes('/')) {
-		if (path.startsWith('/')) 
-			path = path.slice(1) // TODO
-		else if (path.startsWith('./'))
-			path = path.slice(2)
+// Tests UWP StorageFolder if it's just a random folder or a drive (like C:\)
+export function isFolderDrive(folder) {
+	return folder.name === folder.path && folder.path.endsWith(':\\')
+}
+
+export function getOptions(options, defaultOptions = {}) {
+	if (options === null || options === undefined || typeof options === 'function')
+		return defaultOptions
+	if (typeof options === 'string')
+		return Object.assign({}, defaultOptions, {encoding: options})
+	else if (typeof options === 'object')
+		return Object.assign({}, options, defaultOptions)
+}
+
+export function nullCheck(path, callback) {
+	if (('' + path).indexOf('\u0000') === -1)
+		return true
+	const er = new Error('ERR_INVALID_ARG_TYPE')
+	if (typeof callback !== 'function')
+		throw er
+	process.nextTick(callback, er)
+	return false
+}
+/*
+export function nullCheck(path, callback) {
+	if (('' + path).indexOf('\u0000') !== -1) {
+		const er = new errors.Error('ERR_INVALID_ARG_TYPE', 'path', 'string without null bytes', path)
+		if (typeof callback !== 'function')
+			throw er
+		process.nextTick(callback, er)
+		return false
 	}
-	if (path.includes('/')) {
-		var [folderPath, fileName] = splitPath(path)
-		// TODO: handle '..' to go up
-		try {
-			folder = await folder.getFolderAsync(folderPath)
-		} catch(err) {
-			if (ensure)
-				folder = await createPath(folder, folderPath)
-			else {
-				var desiredFilePath = `${folder.path}/${folderPath}/${fileName}`
-				throw new Error(`ENOENT: no such file or directory, open '${desiredFilePath}'`)
-			}
-		}
-		return [folder, fileName]
-	} else {
-		return [folder, path]
-	}
+	return true
 }
-
-async function createPath(folder, path) {
-	var sections = path.split('/')
-	var section
-	while (section = sections.shift()) {
-
-	}
-}
-
-function splitPath(path) {
-	var index = path.lastIndexOf('/')
-	return [
-		path.slice(0, index),
-		path.slice(index + 1)
-	]
-}
+*/

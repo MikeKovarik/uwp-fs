@@ -1,0 +1,94 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<title>uwp_fs</title>
+	<style>
+		* {
+			box-sizing: border-box;
+			font-family: Segoe UI;
+		}
+		h1,h2,h3 {
+			font-weight: 300;
+		}
+		[layout] {
+			display: flex;
+		}
+		[spaced] > * + * {
+			margin-left: 1rem;
+		}
+		[flex] {
+			flex: 1;
+		}
+
+		html {
+			margin: 0;
+		}
+		body {
+			font-size: 14px;
+			padding: 16px;
+		}
+		pre {
+			font-size: 12px;
+			font-family: Consolas;
+			white-space: pre-line;
+		}
+		.bordered,
+		pre {
+			padding: 6px 8px;
+			border: 2px solid #eee;
+		}
+
+		[layout][vertical] {
+			display: flex;
+			flex-direction: column;
+		}
+		[layout] > [vertical] {
+			height: 100%;
+		}
+			[vertical] > [scroll] {
+				overflow-y: scroll;
+			}
+	</style>
+</head>
+<body layout spaced>
+	
+	<div flex vertical layout>
+		<h2>Test log</h2>
+		<div id="mouka-warning"></div>
+		<pre id="mouka-log" scroll></pre>
+	</div>
+	
+	<div flex vertical layout>
+		<h2>Test results</h2>
+		<div id="mouka-result" scroll></div>
+	</div>
+	
+	<!--div flex>
+		<h2>Examples</h2>
+		<button>read file</button>
+		<button id="request-folder">request folder</button>
+	</div-->
+	
+    <script src="./errcatcher.js"></script>
+
+	<script src="../node_modules_bundled/node-globals-shim.js"></script>
+	<script src="../node_modules_bundled/events.js"></script>
+	<script src="../node_modules_bundled/buffer.js"></script>
+	<script src="../node_modules_bundled/util.js"></script>
+	<script src="../node_modules_bundled/stream.js"></script>
+	<script src="../index.js"></script>
+
+	<script src="../node_modules/mouka/index.js"></script>
+	<!--
+	<script src="/mouka/index.js"></script>
+	-->
+	
+	<script src="./test-stream.js"></script>
+	<!--
+	<script src="./test-watch.js"></script>
+	<script src="./test-fd.js"></script>
+	-->
+
+</body>
+</html>

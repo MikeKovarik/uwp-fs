@@ -1,0 +1,63 @@
+{
+    ">|createReadStream()": {
+        "#|returns ReadStream": "ReadStream",
+        "#|promisify": {
+            "type": "Buffer",
+            "data": [
+                84,
+                104,
+                101,
+                32,
+                119,
+                111,
+                114,
+                108,
+                100,
+                32,
+                99,
+                111,
+                117,
+                108,
+                100,
+                32,
+                97,
+                108,
+                119,
+                97,
+                121,
+                115,
+                32,
+                117,
+                115,
+                101,
+                32,
+                109,
+                111,
+                114,
+                101,
+                32,
+                104,
+                101,
+                97,
+                108,
+                101,
+                114,
+                115,
+                33
+            ]
+        },
+        "#|nonexistent path returns": {
+            "message": "ENOENT: no such file or directory, open 'C:\\Users\\Mike\\OneDrive\\Dev\\uwp-fs\\bin\\Debug\\AppX\\test\\fixtures\\not-existing.txt'",
+            "errno": -4058,
+            "code": "ENOENT",
+            "syscall": "open",
+            "path": "C:\\Users\\Mike\\OneDrive\\Dev\\uwp-fs\\bin\\Debug\\AppX\\test\\fixtures\\not-existing.txt"
+        },
+        "#|folder path returns": {
+            "message": "EISDIR: illegal operation on a directory, read",
+            "errno": -4068,
+            "code": "EISDIR",
+            "syscall": "read"
+        }
+    }
+}

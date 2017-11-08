@@ -12,6 +12,7 @@
     "node-web-streams-adapter": "latest"
   },
   "devDependencies": {
+    "mouka": "latest",
     "rollup": "^0.50.0"
   }
 }

@@ -19,7 +19,7 @@ export default {
 		file: `index.js`,
 		format: 'umd',
 	},
-	name: pkg.name,
+	name: pkg.name
 }
 
 
