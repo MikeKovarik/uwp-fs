@@ -1,8 +1,8 @@
-import {bufferFromIbuffer} from './conv/index.mjs' // TODO: spin into separate module
-import {Readable, Writable} from 'stream'
-import {isUwp} from './util.mjs'
-import {fds, _open, _close, _read, reserveFd} from './syscall.mjs'
 import {ReadStream, WriteStream} from './stream.mjs'
+//import {bufferFromIbuffer} from './conv/index.mjs' // TODO: spin into separate module
+import {isUwp, getOptions, nullCheck, callbackify} from './util.mjs'
+import {getPathFromURL} from './path.mjs'
+import {open, close, read} from './syscall.mjs'
 
 
 if (isUwp) {
@@ -11,6 +11,21 @@ if (isUwp) {
 	var COLLISION = Windows.Storage.CreationCollisionOption
 }
 
+export var readFile = callbackify(async (path, options) => {
+	options = getOptions(options, {flag: 'r'})
+	//path = getPathFromURL(path)
+	//nullCheck(path)
+	var fd = await open(path)
+	//await read(fd)
+	//var storageFile = fds[fd]
+	//var iBuffer = await FileIO.readBufferAsync(storageFile)
+	//var result = bufferFromIbuffer(iBuffer)
+	var result = read(fd, 'TODO', 'TODO', 'TODO', 4)
+	// Close file descriptor
+	await close(fd)
+	return result
+})
+/*
 export async function readFile(path, encoding, callback) {
 	//callback = maybeCallback(callback || options)
 	//options = getOptions(options, { flag: 'r' })
@@ -23,22 +38,23 @@ export async function readFile(path, encoding, callback) {
 	}
 	var fd = reserveFd()
 	try {
-		await _open(path, fd)
-		await _read(fd)
+		await open(path, fd)
+		await read(fd)
 		var storageFile = fds[fd]
 		var iBuffer = await FileIO.readBufferAsync(storageFile)
 		var result = bufferFromIbuffer(iBuffer)
 		// Close file descriptor
-		await _close(fd)
+		await close(fd)
 		if (callback) callback(null, result)
 		return result
 	} catch(err) {
 		// Ensure we're leaving no descriptor open
-		await _close(fd)
+		await close(fd)
 		if (callback) callback(err)
 		throw err
 	}
 }
+*/
 /*
 export async function readFile(path, encoding, callback) {
 	// encoding is optional
@@ -47,26 +63,26 @@ export async function readFile(path, encoding, callback) {
 		encoding = 'utf8'
 	}
 	var fd = reserveFd()
-	return _readFile(fd, path, encoding)
+	return readFile(fd, path, encoding)
 		.then(result => {
 			if (callback) callback(null, result)
 			return result
 		})
 		.catch(err => {
 			// Ensure we're leaving no descriptor open
-			await _close(fd)
+			await close(fd)
 			if (callback) callback(err)
 			return err
 		})
 }
-_readFile(fd, path, encoding) {
-	await _open(path, fd)
-	await _read(fd)
+readFile(fd, path, encoding) {
+	await open(path, fd)
+	await read(fd)
 	var storageFile = fds[fd]
 	var iBuffer = await FileIO.readBufferAsync(storageFile)
 	var result = bufferFromIbuffer(iBuffer)
 	// Close file descriptor
-	await _close(fd)
+	await close(fd)
 	return result
 }*/
 
@@ -77,7 +93,7 @@ function isFd(path) {
 
 export async function writeFile(path, data, encoding, callback) {
 	callback = maybeCallback(callback || options)
-	options = getOptions({encoding: 'utf8', mode: 0o666, flag: 'w'}, options)
+	options = getOptions(options, {encoding: 'utf8', mode: 0o666, flag: 'w'})
 
 	if (isFd(path)) {
 		writeFd(path, true)
@@ -93,7 +109,7 @@ export async function writeFile(path, data, encoding, callback) {
 
 	//var fd = reserveFd()
 	try {
-		//fd = await _open(path)
+		//fd = await open(path)
 		var storageFile = await targetFolder.createFileAsync(fileName, COLLISION.replaceExisting)
 		if (typeof data === 'string') {
 			await FileIO.writeTextAsync(storageFile, data)
@@ -103,7 +119,7 @@ export async function writeFile(path, data, encoding, callback) {
 		if (callback) callback(null)
 	} catch(err) {
 		// Ensure we're leaving no descriptor open
-		//await _close(fd)
+		//await close(fd)
 		if (callback) callback(err)
 		throw err
 	}

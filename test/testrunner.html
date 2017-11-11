@@ -31,7 +31,9 @@
 		pre {
 			font-size: 12px;
 			font-family: Consolas;
-			white-space: pre-line;
+			white-space: pre-wrap;
+			word-wrap: break-word;
+			word-break: break-all;
 		}
 		.bordered,
 		pre {
@@ -79,15 +81,20 @@
 	<script src="../node_modules_bundled/stream.js"></script>
 	<script src="../index.js"></script>
 
-	<script src="../node_modules/mouka/index.js"></script>
-	<!--
+    <script src="../node_modules/chai/chai.js"></script>
+    <script src="../node_modules/mouka/index.js"></script>
 	<script src="/mouka/index.js"></script>
-	-->
 	
-	<script src="./test-stream.js"></script>
 	<!--
-	<script src="./test-watch.js"></script>
-	<script src="./test-fd.js"></script>
+    <script src="./path.js"></script>
+	-->
+    <script src="./lowlevel.js"></script>
+	<!--
+    <script src="./file.js"></script>
+	<script src="./folder.js"></script>
+	<script src="./stream.js"></script>
+	<script src="./watch.js"></script>
+	<script src="./fd.js"></script>
 	-->
 
 </body>

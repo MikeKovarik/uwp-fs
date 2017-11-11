@@ -32,6 +32,11 @@ export var ERROR = {
 		code: 'EADDRINUSE',
 		description: 'address already in use'
 	},
+	EINVAL: {
+		errno: -4071, // 18
+		code: 'EINVAL',
+		description: 'invalid argument'
+	},
 	ENOTDIR: {
 		errno: -4052, // 27
 		code: 'ENOTDIR',
@@ -44,7 +49,8 @@ export var ERROR = {
 	}
 }
 
-export function errnoException(error, syscall, path) {
+// todo: rename this because its custom errno function and not the one found in fs
+export function syscallException(error, syscall, path) {
 	if (error instanceof Error) {
 		var {errno, code} = ERROR.UNKNOWN_UWP
 		var err = error
@@ -70,4 +76,16 @@ export var UWP_ERR = {
 	EACCES: 'Access is denied.\r\n',
 	_INCORRECT: 'The parameter is incorrect.\r\n',
 	_UNSUPPORTED: 'No such interface supported\r\n',
+}
+
+// TODO
+export var errors = {
+	TypeError: makeNodeError(TypeError),
+	RangeError: makeNodeError(RangeError),
+	Error: makeNodeError(Error),
+}
+
+function makeNodeError(Err) {
+	// TODO
+	return Err
 }

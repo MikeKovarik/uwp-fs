@@ -1,5 +1,7 @@
 import {Readable, Writable} from 'stream'
-import {open, read, close} from './lowlevel.mjs'
+import {open, close, read} from './syscall.mjs'
+import {getPathFromURL} from './path.mjs'
+import {errors} from './errors.mjs'
 
 
 var defaultReadStreamOptions = {
@@ -143,7 +145,6 @@ export class ReadStream extends Readable {
 }
 
 
-
 export class WriteStream extends Writable {
 
 	constructor(path, options = {}) {
@@ -187,6 +188,11 @@ export class WriteStream extends Writable {
 
 
 
+if (ReadStream.prototype.destroy === undefined)
+	ReadStream.prototype.destroy = ReadStream.prototype.close
+if (WriteStream.prototype.destroy === undefined)
+	WriteStream.prototype.destroy = WriteStream.prototype.end
+
 
 
 
@@ -195,6 +201,18 @@ function closeFsStream(stream, cb, err) {
 		.catch(() => stream.emit('close'))
 		.catch(er => cb(er || err))
 }
+
+function handleError(val, callback) {
+  if (val instanceof Error) {
+    if (typeof callback === 'function') {
+      process.nextTick(callback, val);
+      return true;
+    } else throw val;
+  }
+  return false;
+}
+
+
 
 
 

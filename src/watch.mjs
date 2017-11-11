@@ -1,7 +1,7 @@
 import EventEmitter from 'events'
 import util from 'util'
 import {isUwp, getOptions, nullCheck} from './util.mjs'
-import {fds, _open, _close, _read, reserveFd} from './syscall.mjs'
+import {fds, open, close, read, reserveFd} from './syscall.mjs'
 
 
 
@@ -135,7 +135,7 @@ class FSWatcher extends EventEmitter {
 		//handleError((path = getPathFromURL(path)))
 		nullCheck(path)
 
-		_open(path).then(async fd => {
+		open(path).then(async fd => {
 			var storageFolder = fds[fd]
 
 			var options = new QueryOptions(CommonFileQuery.OrderByName, ['*'])

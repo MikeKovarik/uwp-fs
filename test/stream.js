@@ -17,8 +17,7 @@ if (typeof require === 'function') {
 } else {
 	var fs = window['uwp-fs']
 	var cwd = fs.cwd
-
-	mouka.setup()
+	mouka.setup('cdd')
 }
 
 var timeout = (millis = 0) => new Promise(resolve => setTimeout(resolve, millis))

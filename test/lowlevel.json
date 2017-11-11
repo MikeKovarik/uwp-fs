@@ -1,0 +1,141 @@
+{
+  ">|.open": {
+    "#|./": 3,
+    "#|\\Windows": 3,
+    "#|fixtures\\ow-quotes.txt": 3,
+    "#|fixtures\\not-existing-file.txt": {
+      "message": "ENOENT: no such file or directory, open 'C:\\Users\\Mike\\OneDrive\\Dev\\uwp-fs\\bin\\Debug\\AppX\\test\\fixtures\\not-existing-file.txt'",
+      "name": "Error",
+      "errno": -4058,
+      "code": "ENOENT",
+      "syscall": "open",
+      "path": "C:\\Users\\Mike\\OneDrive\\Dev\\uwp-fs\\bin\\Debug\\AppX\\test\\fixtures\\not-existing-file.txt"
+    },
+    "#|fixtures/not-existing-foler/": {
+      "message": "ENOENT: no such file or directory, open 'C:\\Users\\Mike\\OneDrive\\Dev\\uwp-fs\\bin\\Debug\\AppX\\test\\fixtures\\not-existing-foler'",
+      "name": "Error",
+      "errno": -4058,
+      "code": "ENOENT",
+      "syscall": "open",
+      "path": "C:\\Users\\Mike\\OneDrive\\Dev\\uwp-fs\\bin\\Debug\\AppX\\test\\fixtures\\not-existing-foler"
+    }
+  },
+  ">|.read": {
+    "#|whole file": {
+      "type": "Buffer",
+      "data": [84,104,101,32,119,111,114,108,100,32,99,111,117,108,100,32,97,108,119,97,121,115,32,117,115,101,32,109,111,114,101,32,104,101,97,108,101,114,115,33]
+    },
+    "#|partial (first half)": {
+      "type": "Buffer",
+      "data": [84,104,101,32,119,111,114,108,100,32,99,111,117,108,100,32,97,108,119,97]
+    },
+    "#|partial (second half)": {
+      "type": "Buffer",
+      "data": [121,115,32,117,115,101,32,109,111,114,101,32,104,101,97,108,101,114,115,33]
+    },
+    "#|sebsequent, by chunks": {
+      "type": "Buffer",
+      "data": [84,104,101,32,119,111,114,108,100,32,99,111,117,108,100,32,97,108,119,97,121,115,32,117,115,101,32,109,111,114,101,32,104,101,97,108,101,114,115,33]
+    },
+    "#|7 characters from middle of file into beginning of small buffer": {
+      "type": "Buffer",
+      "data": [104,101,97,108,101,114,115]
+    },
+    "#|into second half of buffer": {
+      "type": "Buffer",
+      "data": [1,1,1,1,1,1,1,1,1,1,104,101,97,108,101,114,115]
+    },
+    "#|into second middle of buffer": {
+      "type": "Buffer",
+      "data": [1,1,1,1,1,104,101,97,108,101,114,115,1,1,1,1,1]
+    },
+    "#|into beginning of buffer": {
+      "type": "Buffer",
+      "data": [104,101,97,108,101,114,115,1,1,1,1,1,1,1,1,1,1]
+    },
+    "#|rewrite": {
+      "type": "Buffer",
+      "data": [119,111,114,108,100,115]
+    },
+    "#|to negative offset in buffer": {
+      "message": "Offset is out of bounds",
+      "name": "Error"
+    },
+    "#|overflow end of buffer": {
+      "message": "Length extends beyond buffer",
+      "name": "RangeError"
+    },
+    "#|beyond the size of buffer": {
+      "message": "Offset is out of bounds",
+      "name": "Error"
+    },
+    "#|position overflowing": {
+      "type": "Buffer",
+      "data": [104,101,97,108,101,114,115,33,1,1,1,1,1,1,1]
+    },
+    "#|position beyond the size of file": {
+      "type": "Buffer",
+      "data": [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    },
+    "#|poition negative": {
+      "message": "EINVAL: invalid argument, read",
+      "name": "Error",
+      "errno": -4071,
+      "code": "EINVAL",
+      "syscall": "read"
+    },
+    "#|into small buffer": {
+      "message": "Length extends beyond buffer",
+      "name": "RangeError"
+    }
+  },
+  ">|.exists": {
+    "#|file": true,
+    "#|folder": true,
+    "#|non existing file": false,
+    "#|non existing folder": false
+  },
+  ">|.stat": {
+    "#|file": {
+      "size": 40,
+      "atimeMs": "number",
+      "mtimeMs": "number",
+      "ctimeMs": "number",
+      "birthtimeMs": "number",
+      "atime": "Date",
+      "mtime": "Date",
+      "ctime": "Date",
+      "birthtime": "Date"
+    },
+    "#|folder": {
+      "size": 0,
+      "atimeMs": "number",
+      "mtimeMs": "number",
+      "ctimeMs": "number",
+      "birthtimeMs": "number",
+      "atime": "Date",
+      "mtime": "Date",
+      "ctime": "Date",
+      "birthtime": "Date"
+    },
+    "#|non existing file": {
+      "message": "ENOENT: no such file or directory, stat 'C:\\Users\\Mike\\OneDrive\\Dev\\uwp-fs\\bin\\Debug\\AppX\\test\\fixtures\\not-existing-file.txt'",
+      "name": "Error",
+      "errno": -4058,
+      "code": "ENOENT",
+      "syscall": "stat",
+      "path": "C:\\Users\\Mike\\OneDrive\\Dev\\uwp-fs\\bin\\Debug\\AppX\\test\\fixtures\\not-existing-file.txt"
+    },
+    "#|non existing folder": {
+      "message": "ENOENT: no such file or directory, stat 'C:\\Users\\Mike\\OneDrive\\Dev\\uwp-fs\\bin\\Debug\\AppX\\test\\fixtures\\not-existing-foler'",
+      "name": "Error",
+      "errno": -4058,
+      "code": "ENOENT",
+      "syscall": "stat",
+      "path": "C:\\Users\\Mike\\OneDrive\\Dev\\uwp-fs\\bin\\Debug\\AppX\\test\\fixtures\\not-existing-foler"
+    }
+  },
+  ">|complex example": {
+    "#|1": "The world could always use more healers!"
+  }
+}
