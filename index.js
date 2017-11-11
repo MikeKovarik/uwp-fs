@@ -1,11 +1,23 @@
 (function (global, factory) {
-	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('buffer'), require('stream'), require('node-web-streams-adapter'), require('events'), require('util')) :
-	typeof define === 'function' && define.amd ? define(['exports', 'buffer', 'stream', 'node-web-streams-adapter', 'events', 'util'], factory) :
-	(factory((global['uwp-fs'] = {}),global.buffer,global.stream,global['node-web-streams-adapter'],global.events,global.util));
-}(this, (function (exports,buffer,stream,nodeWebStreamsAdapter,EventEmitter,util) { 'use strict';
+	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('stream'), require('buffer'), require('node-web-streams-adapter'), require('events'), require('util')) :
+	typeof define === 'function' && define.amd ? define(['exports', 'stream', 'buffer', 'node-web-streams-adapter', 'events', 'util'], factory) :
+	(factory((global['uwp-fs'] = {}),global.stream,global.buffer,global['node-web-streams-adapter'],global.events,global.util));
+}(this, (function (exports,stream,buffer,nodeWebStreamsAdapter,EventEmitter,util) { 'use strict';
 
 EventEmitter = EventEmitter && EventEmitter.hasOwnProperty('default') ? EventEmitter['default'] : EventEmitter;
 util = util && util.hasOwnProperty('default') ? util['default'] : util;
+
+if (typeof process$1 === 'undefined')
+	var process$1 = {};
+
+if (typeof process$1.nextTick === 'undefined')
+	//process.nextTick = (fn, ...args) => setTimeout(() => fn(...args))
+	process$1.nextTick = (fn, ...args) => {
+		console.log('nextTick');
+		console.log('fn', fn);
+		console.log('args', args);
+		setTimeout(() => fn(...args));
+	};
 
 var isUwp = typeof Windows !== 'undefined';
 
@@ -18,6 +30,28 @@ var ready = new Promise(resolve => {
 
 function wrapPromise(promise) {
 	return new Promise((resolve, reject) => promise.then(resolve, reject))
+}
+
+function callbackify(promiseOrFunction, callback) {
+	if (callback === undefined) {
+		return (...args) => {
+			if (typeof args[args.length - 1] === 'function') 
+				return _callbackify(promiseOrFunction(...args), args.pop())
+			else
+				return _callbackify(promiseOrFunction(...args))
+		}
+	} else {
+		return _callbackify(promiseOrFunction, callback)
+	}
+}
+function _callbackify(promise, callback) {
+	if (callback) {
+		promise
+			.then(data => callback(null, data))
+			.catch(err => process$1.nextTick(callback, err));
+			//.catch(err => callback(err))
+	}
+	return promise
 }
 
 // Strips drive name from path (creates path relative to the drive)
@@ -42,7 +76,8 @@ function isFolderDrive(folder) {
 	return folder.name === folder.path && folder.path.endsWith(':\\')
 }
 
-function getOptions$1(options, defaultOptions = {}) {
+// todo investigate deprecation
+function getOptions(options, defaultOptions = {}) {
 	if (options === null || options === undefined || typeof options === 'function')
 		return defaultOptions
 	if (typeof options === 'string')
@@ -51,27 +86,15 @@ function getOptions$1(options, defaultOptions = {}) {
 		return Object.assign({}, options, defaultOptions)
 }
 
-function nullCheck(path, callback) {
-	if (('' + path).indexOf('\u0000') === -1)
-		return true
-	const er = new Error('ERR_INVALID_ARG_TYPE');
-	if (typeof callback !== 'function')
-		throw er
-	process.nextTick(callback, er);
-	return false
+// todo deprecate
+function maybeCallback$1(cb) {
+	return typeof cb === 'function' ? cb : rethrow();
 }
-/*
-export function nullCheck(path, callback) {
-	if (('' + path).indexOf('\u0000') !== -1) {
-		const er = new errors.Error('ERR_INVALID_ARG_TYPE', 'path', 'string without null bytes', path)
-		if (typeof callback !== 'function')
-			throw er
-		process.nextTick(callback, er)
-		return false
-	}
-	return true
+
+function nullCheck(path) {
+	if (('' + path).indexOf('\u0000') !== -1)
+		throw new errors.Error('ERR_INVALID_ARG_TYPE', 'path', 'string without null bytes', path)
 }
-*/
 
 // refference:
 // win: https://github.com/nodejs/node/blob/master/deps/uv/include/uv-errno.h
@@ -107,6 +130,11 @@ var ERROR = {
 		code: 'EADDRINUSE',
 		description: 'address already in use'
 	},
+	EINVAL: {
+		errno: -4071, // 18
+		code: 'EINVAL',
+		description: 'invalid argument'
+	},
 	ENOTDIR: {
 		errno: -4052, // 27
 		code: 'ENOTDIR',
@@ -119,7 +147,8 @@ var ERROR = {
 	}
 };
 
-function errnoException(error, syscall, path) {
+// todo: rename this because its custom errno function and not the one found in fs
+function syscallException(error, syscall, path) {
 	if (error instanceof Error) {
 		var {errno, code} = ERROR.UNKNOWN_UWP;
 		var err = error;
@@ -146,6 +175,18 @@ var UWP_ERR = {
 	_INCORRECT: 'The parameter is incorrect.\r\n',
 	_UNSUPPORTED: 'No such interface supported\r\n',
 };
+
+// TODO
+var errors$1 = {
+	TypeError: makeNodeError(TypeError),
+	RangeError: makeNodeError(RangeError),
+	Error: makeNodeError(Error),
+};
+
+function makeNodeError(Err) {
+	// TODO
+	return Err
+}
 
 ;
 
@@ -187,7 +228,7 @@ function uwpSetCwdFolder(newFolder) {
 // Windows filesystem uses \ instead of /. Node tolerates that, but UWP apis
 // strictly require only \ or they'll throw error.
 // Normalizes path by stripping unnecessary slashes and adding drive letter if needed
-function getPathFromURL$1(path) {
+function getPathFromURL(path) {
 	// Strip spaces around and convert all slashes to windows backslashes
 	path = path.trim().replace(/\//g, '\\');
 	// convert absolute paths to absolute C:\ paths
@@ -216,52 +257,13 @@ function normalizeArray(parts) {
 }
 
 if (isUwp) {
-	var {StorageFolder: StorageFolder$1, StorageFile: StorageFile$1, AccessCache} = Windows.Storage;
+	var {StorageFolder: StorageFolder$1, StorageFile: StorageFile$1} = Windows.Storage;
 }
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// CACHED STORAGE OBJECTS (OF DRIVES)
-
-var uwpDrives = new Map;
-var uwpStorageCache;
-if (isUwp) {
-	uwpStorageCache = AccessCache.StorageApplicationPermissions.futureAccessList;
-}
-
-const warnMessage = `UWP-FS does not have permission to access C:\\.
-FS module might not behave as expected.
-Use .uwpPickAndCacheDrive() to force user to give you the permission.`;
-
-async function fetchCachedDrives() {
-	var folderPromises = uwpStorageCache.entries
-		.map(entry => entry.token)
-		.map(token => uwpStorageCache.getItemAsync(token));(await Promise.all(folderPromises))
-		.filter(isFolderDrive)
-		.forEach(drive => {
-			var driveLetter = extractDrive(drive.path);
-			uwpDrives.set(driveLetter, drive);
-			uwpDrives.set(driveLetter.toUpperCase(), drive);
-		});
-	if (!uwpDrives.has('c')) {
-		console.warn(warnMessage);
-		setTimeout(() => console.warn(warnMessage), 1000);
-	}
-}
-
-if (isUwp) {
-	readyPromises.push(fetchCachedDrives());
-}
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// PATH RESOLVING
 
 
 async function openStorageObject(path, syscall) {
 	// Sanitize backslashes, normalize format, and turn the path into absolute path.
-	path = getPathFromURL$1(path);
+	path = getPathFromURL(path);
 	// Go straight to StorageFolder resolution if the path points to a drive.
 	if (path.endsWith(':\\'))
 		return _openStorageFolder(path, syscall)
@@ -269,10 +271,10 @@ async function openStorageObject(path, syscall) {
 	try {
 		return await StorageFile$1.getFileFromPathAsync(path)
 	} catch(err) {
-		if (err.message == UWP_ERR.ENOENT || err.message === UWP_ERR._INCORRECT || err.message === UWP.ERR._UNSUPPORTED) {
+		if (err.message == UWP_ERR.ENOENT || err.message === UWP_ERR._INCORRECT || err.message === UWP_ERR._UNSUPPORTED) {
 			return _openStorageFolder(path, syscall)
 		} else {
-			throw handleError$1(err, syscall, path)
+			throw processError(err, syscall, path)
 		}
 	}
 }
@@ -283,13 +285,13 @@ async function _openStorageFolder(path, syscall) {
 	try {
 		return await StorageFolder$1.getFolderFromPathAsync(path)
 	} catch(err) {
-		throw handleError$1(err, syscall, path)
+		throw processError(err, syscall, path)
 	}
 }
 
 async function openStorageFolder(path, syscall) {
 	// Sanitize backslashes, normalize format, and turn the path into absolute path.
-	path = getPathFromURL$1(path);
+	path = getPathFromURL(path);
 	// Get the folder object that corresponds to absolute path in the file system.
 	try {
 		return await StorageFolder$1.getFolderFromPathAsync(path)
@@ -297,18 +299,18 @@ async function openStorageFolder(path, syscall) {
 		switch (err.message) {
 			// The path is incorrect or the file/folder is missing.
 			case UWP_ERR.ENOENT:
-				throw errnoException('ENOENT', syscall, path)
+				throw syscallException('ENOENT', syscall, path)
 			// UWP does not have permission to access this scope.
 			case UWP_ERR.EACCES:
-				throw errnoException('EACCES', syscall, path)
+				throw syscallException('EACCES', syscall, path)
 			default:
 				var storageFile;
 				try {
 					storageFile = await StorageFile$1.getFileFromPathAsync(path);
 				} catch(e) {
-					throw handleError$1(err, syscall, path)
+					throw processError(err, syscall, path)
 				} 
-				throw errnoException('ENOTDIR', syscall, path)
+				throw syscallException('ENOTDIR', syscall, path)
 		}
 	}
 }
@@ -316,12 +318,12 @@ async function openStorageFolder(path, syscall) {
 
 async function openStorageFile(path, syscall) {
 	// Sanitize backslashes, normalize format, and turn the path into absolute path.
-	path = getPathFromURL$1(path);
+	path = getPathFromURL(path);
 	// Get the file object that corresponds to absolute path in the file system.
 	try {
 		return await StorageFile$1.getFileFromPathAsync(path)
 	} catch(err) {
-		throw handleError$1(err, syscall, path)
+		throw processError(err, syscall, path)
 	}
 }
 
@@ -330,28 +332,29 @@ async function openStorageFile(path, syscall) {
 
 
 // Translates UWP errors into Node format (with code, errno and path)
-function handleError$1(err, syscall, path, storageObjectType) {
+function processError(err, syscall, path, storageObjectType) {
 	// Compare UWP error messages with list of known meanings
 	switch (err.message) {
 		// The path is incorrect or the file/folder is missing.
 		case UWP_ERR.ENOENT:
-			throw errnoException('ENOENT', syscall, path)
+			throw syscallException('ENOENT', syscall, path)
 		// UWP does not have permission to access this scope.
 		case UWP_ERR.EACCES:
-			throw errnoException('EACCES', syscall, path)
+			throw syscallException('EACCES', syscall, path)
 		// Incorrect parameter is usually thrown when trying to open folder as file and vice versa.
 		/*case UWP_ERR._INCORRECT:
 			if (storageObjectType === 'folder') {
-				throw errnoException('ENOTDIR', syscall, path)
+				throw syscallException('ENOTDIR', syscall, path)
 				break
 			}*/
 		default:
-			throw errnoException(err, syscall, path)
+			throw syscallException(err, syscall, path)
 	}
 }
 
 if (isUwp) {
-	var {StorageFolder, StorageFile} = Windows.Storage;
+	var {StorageFolder, StorageFile, FileAccessMode: FileAccessMode$1} = Windows.Storage;
+	var {DataReader} = Windows.Storage.Streams;
 }
 
 // List of active File Descriptors.
@@ -379,30 +382,141 @@ function reserveFd() {
 	return fd
 }
 
-// syscall used in: open
-async function _open$1(path, fd) {
-	// Find empty fd number (slot for next descriptor we are about to open).
-	if (fd === undefined)
-		fd = reserveFd();
-	// Try to get file or folder descriptor for given path and store it to the empty slot.
-	fds$1[fd] = await openStorageObject(path, 'open');
-	return fd
-}
-/*
+
+
+
+var open = callbackify(async (path, flags = 'r', mode = 0o666) => {
+	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
+	path = getPathFromURL(path);
+	nullCheck(path);
 	// Access UWP's File object
-	var file = await targetFolder.getFileAsync(fileName)
-	// Open file's read stream
-	switch
-	FileAccessMode.read
-	FileAccessMode.readWrite
-	var uwpStream = await file.openAsync(FileAccessMode.read)
+	// Note: Not wrapped in try/catching because openStorageObject() returns sanitized Node-like error object.
+	var storageObject = await openStorageObject(path, 'open');
+
+	var folder, file, stream$$1, reader, writer;
+	if (storageObject.constructor === StorageFolder) {
+		folder = storageObject;
+	}
+
+	if (storageObject.constructor === StorageFile) {
+		file = storageObject;
+		// Open file's read stream
+		// TODO: wrap in try/catch and handle errors
+		stream$$1 = await storageObject.openAsync(FileAccessMode$1.read);
+		if (!window.iStream)
+			window.iStream = stream$$1;
+		if (flags.includes('r'))
+			var reader = new DataReader(stream$$1);
+		if (flags === 'r+')
+			writer = 'TODO';
+		//FileAccessMode.read
+		//FileAccessMode.readWrite
+	}
+
+	var fd = reserveFd();
+	fds$1[fd] = {file, folder, storageObject, stream: stream$$1, reader, writer, path};
+	return fd
+});
+
+
+/*
+Read data from the file specified by 'fd'.
+'buffer' is the buffer that the data will be written to.
+'offset' is the offset in the buffer to start writing at.
+'length' is an integer specifying the number of bytes to read.
+'position' is an argument specifying where to begin reading from in the file. If position is null, data will be read from the current file position, and the file position will be updated. If position is an integer, the file position will remain unchanged.
+The callback is given the three arguments, '(err, bytesRead, buffer)'.
 */
+async function _read(fd, buffer$$1, offset, length, position) {
+	//throw new errors.RangeError('Length extends beyond buffer')
+	if (position < 0)
+		throw syscallException('EINVAL', 'read')
+	if (offset < 0 || offset > buffer$$1.length)
+		throw new errors$1.Error('Offset is out of bounds')
+	if (offset + length > buffer$$1.length)
+		throw new errors$1.RangeError('Length extends beyond buffer')
 
+	var {stream: stream$$1, reader} = fds$1[fd];
 
-// syscall used in: close
-async function _close(fd) {
-	if (typeof fd === 'number') clearFd(fd);
+	// Set position where to begin reading from in the file.
+	if (position !== null)
+		stream$$1.seek(position);
+	// Assess the ammount of bytes we want to read.
+	//var bytesToRead = length || stream.size
+	var bytesToRead = Math.min(stream$$1.size - position, length);
+	console.log('should read', length);
+	console.log('will read', bytesToRead);
+	// Request to read that ammount of bytes, but but ready to comply to UWP's restictions.
+    var bytesRead = await reader.loadAsync(bytesToRead);
+	//var bytesRead = reader.unconsumedBufferLength
+	var view = buffer$$1.slice(offset, offset + bytesRead);
+	//var view = buffer.slice(offset, offset + length)
+	//var view = Buffer.allocUnsafe(bytesRead)
+	// Now that UWP loaded the bytes for use, we can read them into our buffer.
+	reader.readBytes(view);
+	return {bytesRead, buffer: buffer$$1}
 }
+// NOTE: not using callbackify() because Node's fs.read() when wrapped in Node's util.promisify()
+//       returns different things.
+//       - Callback has error and two arguments (instead of just one): bytesRead, buffer
+//       - Promise returns an object with bytesRead and buffer properties: {bytesRead, buffer}
+function read(fd, buffer$$1, offset, length, position, callback) {
+	var promise = _read(fd, buffer$$1, offset, length, position);
+	if (callback) {
+		promise
+			.then(({bytesRead, buffer: buffer$$1}) => callback(null, bytesRead, buffer$$1))
+			.catch(err => callback(err));
+	}
+	return promise
+}
+//await storageFolder.CreateFileAsync("sample.txt", Windows.Storage.CreationCollisionOption.ReplaceExisting);
+
+
+var close = callbackify(async fd => {
+	var content = fds$1[fd];
+	if (typeof fd === 'number') clearFd(fd);
+	if (!content) return
+	var {file, folder, stream: stream$$1, reader, writer} = content;
+	// TODO
+	if (reader)
+		reader.close();
+	if (writer)
+		writer.close();
+	// Note: C# has .Dispose(), JS has .close() variant
+	if (stream$$1)
+		stream$$1.close();
+});
+
+var exists = callbackify(async path => {
+	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
+	path = getPathFromURL(path);
+	nullCheck(path);
+	try {
+		await openStorageObject(path);
+		return true
+	} catch(err) {
+		console.log(err);
+		if (err.code === 'ENOENT')
+			return false
+		else
+			throw err
+	}
+});
+
+var stat = callbackify(async path => {
+	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
+	path = getPathFromURL(path);
+	nullCheck(path);
+	// Access UWP's File object
+	// Note: Not wrapped in try/catching because openStorageObject() returns sanitized Node-like error object.
+	var storageObject = await openStorageObject(path, 'stat');
+	// Create Stats instance, wait for the hidden ready promise (UWP apis are async) and return it
+	var stats = new Stats(storageObject);
+	await stats._ready;
+	return stats
+});
+
+
 
 // syscall used in: readdir
 async function _scandir(path, fd) {
@@ -414,71 +528,88 @@ async function _scandir(path, fd) {
 	return fd
 }
 
-// syscall used in: readFile
-// NOTE: this does not behave quite like actual Node's read syscall,
-//       that is called like so binding.read(this.fd, buffer, offset, length, ...)
-//       this merely just ensures proper errors are thrown in places where read syscall is used.
-//       Actual reading is solved outside. But it might be worth rewriting and put the readin in here.
-async function _read(fd) {
-	var storageObject = fds$1[fd];
-	if (storageObject.constructor === StorageFolder)
-		throw errnoException('EISDIR', 'read')
+/*
+// syscall used in: open
+export async function _open(path, fd) {
+	// Find empty fd number (slot for next descriptor we are about to open).
+	if (fd === undefined)
+		fd = reserveFd()
+	// Try to get file or folder descriptor for given path and store it to the empty slot.
+	fds[fd] = await openStorageObject(path, 'open')
 	return fd
 }
 
-/*
-// buffer - is the buffer that the data will be written to.
-// offset - is the offset in the buffer to start writing at.
-// length - is an integer specifying the number of bytes to read.
-// position - is an argument specifying where to begin reading from in the file. If position is null, data will be read from the current file position, and the file position will be updated. If position is an integer, the file position will remain unchanged.
-export function _read(fd, buffer, offset, length, position) {
-	var reader = readers[fd]
-	var data = reader.readBytes(nodeBuffer)
-	reader.close()
-	return nodeBuffer
+export async function _read(fd) {
+	var storageObject = fds[fd]
+	if (storageObject.constructor === StorageFolder)
+		throw syscallException('EISDIR', 'read')
+	return fd
 }
-
-var iBuffer = await FileIO.readBufferAsync(storageFile)
-var reader = DataReader.fromBuffer(iBuffer)
-
-var nodeBuffer = Buffer.allocUnsafe(iBuffer.length)
-
-_read(fd, nodeBuffer, 0, iBuffer.length, 0)
 */
 
-async function open(path, flags, mode, callback) {
-	// TODO: flags
-	// flag 'w' creates empty file
-	var fd = reserveFd();
-	var syscallPromise = _open$1(path, fd);
-	syscallPromise
-		.then(fd => callback && callback(null, fd))
-		.catch(err => {
-			_close(fd);
-			if (callback) callback(err);
+
+
+const DATE_ACCESSED = 'System.DateAccessed';
+
+// time "Access Time" - Time when file data last accessed.
+// mtime "Modified Time" - Time when file data last modified.
+// ctime "Change Time" - Time when file status was last changed
+class Stats {
+
+	constructor(storageObject) {
+		this.storageObject = storageObject;
+		Object.defineProperty(this, '_ready', {
+			enumerable: false,
+			value: this._collectInfo()
 		});
-	return syscallPromise
-}
+	}
 
-// fs.close
-function close(fd, callback) {
-	_close(fd);
-	if (callback)
-		callback(null);
-}
+	async _collectInfo() {
+		var file = this.storageObject;
+		var {dateCreated} = file;
+		
+		this.birthtime   = dateCreated;
+		this.birthtimeMs = dateCreated.valueOf();
+
+		// Get basic properties
+		var {size, dateModified} = await file.getBasicPropertiesAsync();
+		this.size = size;
+		this.mtime   = this.ctime   = dateModified;
+		this.mtimeMs = this.ctimeMs = dateModified.valueOf();
+
+		// Get extra properties
+		var extraProperties = await file.properties.retrievePropertiesAsync([DATE_ACCESSED])
+			.then(data => Object.assign({}, data));
+
+		var dateAccessed = extraProperties[DATE_ACCESSED];
+		this.atime   = dateAccessed;
+		this.atimeMs = dateAccessed.valueOf();
+	}
+
+	isFile() {
+		return this.storageObject.constructor === StorageFile
+	}
+
+	isDirectory() {
+		return this.storageObject.constructor === StorageFolder
+	}
+
+	isBlockDevice() {
+	}
+
+	isCharacterDevice() {
+	}
+
+	isSymbolicLink() {
+	}
+
+	isFIFO() {
+	}
+
+	isSocket() {
+	}
 
 
-/*
-Read data from the file specified by 'fd'.
-'buffer' is the buffer that the data will be written to.
-'offset' is the offset in the buffer to start writing at.
-'length' is an integer specifying the number of bytes to read.
-'position' is an argument specifying where to begin reading from in the file. If position is null, data will be read from the current file position, and the file position will be updated. If position is an integer, the file position will remain unchanged.
-The callback is given the three arguments, '(err, bytesRead, buffer)'.
-*/
-async function read(fd, buffer$$1, offset, length, position, callback) {
-	var storageObject = fds$1[fd];
-	//if (callback) callback(null)
 }
 
 async function readdir(path, callback) {
@@ -490,12 +621,12 @@ async function readdir(path, callback) {
 			.map(getNames)
 			.sort();
 		// Close file descriptor
-		await _close(fd);
+		await close(fd);
 		if (callback) callback(null, result);
 		return result
 	} catch(err) {
 		// Ensure we're leaving no descriptor open
-		await _close(fd);
+		await close(fd);
 		if (callback) callback(err);
 		throw err
 	}
@@ -868,7 +999,7 @@ function readableStreamFromReadable(readable = this) {
 }
 
 if (typeof Windows === 'object') {
-	var {DataReader: DataReader$1, DataWriter: DataWriter$1, InputStreamOptions} = Windows.Storage.Streams;
+	var {DataReader: DataReader$2, DataWriter: DataWriter$1, InputStreamOptions} = Windows.Storage.Streams;
 }
 
 
@@ -884,7 +1015,7 @@ class UwpStreamSource extends UnderlyingSourceWrapper {
 
 	_start(controller) {
 		// Instantiate UWP DataReader from the input stream
-		this.reader = new DataReader$1(this.source);
+		this.reader = new DataReader$2(this.source);
 		// Makes the stream available for reading (loadAsync) whenever there are any data,
 		// no matter how much. Without it, the reader would wait for all of the 'desiredSize'
 		// to be in the stream first, before it would let us read it all at once.
@@ -916,7 +1047,7 @@ class UwpStreamSink extends UnderlyingSinkWrapper {
 
 	_start(controller) {
 		// Instantiate UWP DataReader from the input stream
-		this.reader = new DataReader$1(this.source);
+		this.reader = new DataReader$2(this.source);
 		// Makes the stream available for reading (loadAsync) whenever there are any data,
 		// no matter how much. Without it, the reader would wait for all of the 'desiredSize'
 		// to be in the stream first, before it would let us read it all at once.
@@ -962,7 +1093,7 @@ function readableStreamFromUwpStream(uwpStream = this, options = {}) {
 function bufferFromIbuffer(iBuffer) {
 	// Note this is not a custom extension of DataReader class but builtin method
 	// that accepts UWP IBuffer.
-	var reader = DataReader$1.fromBuffer(iBuffer);
+	var reader = DataReader$2.fromBuffer(iBuffer);
 	var byteSize = reader.unconsumedBufferLength;
 	var nodeBuffer = buffer.Buffer.allocUnsafe(byteSize);
 	var data = reader.readBytes(nodeBuffer);
@@ -1136,16 +1267,16 @@ class ReadStream extends stream.Readable {
 
 		if (this.start !== undefined) {
 			if (typeof this.start !== 'number') {
-				throw new errors.TypeError('ERR_INVALID_ARG_TYPE', 'start', 'number', this.start)
+				throw new errors$1.TypeError('ERR_INVALID_ARG_TYPE', 'start', 'number', this.start)
 			}
 			if (this.end === undefined) {
 				this.end = Infinity;
 			} else if (typeof this.end !== 'number') {
-				throw new errors.TypeError('ERR_INVALID_ARG_TYPE', 'end', 'number', this.end)
+				throw new errors$1.TypeError('ERR_INVALID_ARG_TYPE', 'end', 'number', this.end)
 			}
 			if (this.start > this.end) {
 				const errVal = `{start: ${this.start}, end: ${this.end}}`;
-				throw new errors.RangeError('ERR_VALUE_OUT_OF_RANGE', 'start', '<= "end"', errVal)
+				throw new errors$1.RangeError('ERR_VALUE_OUT_OF_RANGE', 'start', '<= "end"', errVal)
 			}
 			this.pos = this.start;
 		}
@@ -1164,7 +1295,7 @@ class ReadStream extends stream.Readable {
 			.then(fd => {
 				this.fd = fd;
 				this.emit('open', fd);
-				// start the flow of data.
+				// Start the flow of data.
 				this.read();
 			})
 			.catch(err => {
@@ -1181,7 +1312,7 @@ class ReadStream extends stream.Readable {
 		if (this.destroyed)
 			return
 
-		// discard the old pool.
+		// Discard the old pool.
 		if (!pool || pool.length - pool.used < kMinPoolSpace)
 			allocNewPool(this._readableState.highWaterMark);
 
@@ -1195,12 +1326,11 @@ class ReadStream extends stream.Readable {
 		if (this.pos !== undefined)
 			toRead = Math.min(this.end - this.pos + 1, toRead);
 
-		// already read everything we were supposed to read!
-		// treat as EOF.
+		// Elready read everything we were supposed to read! Treat as EOF.
 		if (toRead <= 0)
 			return this.push(null)
 
-		// the actual read.
+		// The actual read.
 		read(this.fd, pool, pool.used, toRead, this.pos)
 			.then(bytesRead => {
 				var b = null;
@@ -1216,7 +1346,7 @@ class ReadStream extends stream.Readable {
 				this.emit('error', er);
 			});
 
-		// move the pool positions, and internal position for reading.
+		// Move the pool positions, and internal position for reading.
 		if (this.pos !== undefined)
 			this.pos += toRead;
 		pool.used += toRead;
@@ -1242,7 +1372,6 @@ class ReadStream extends stream.Readable {
 }
 
 
-
 class WriteStream extends stream.Writable {
 
 	constructor(path, options = {}) {
@@ -1255,11 +1384,11 @@ class WriteStream extends stream.Writable {
 
 		if (this.start !== undefined) {
 			if (typeof this.start !== 'number') {
-				throw new errors.TypeError('ERR_INVALID_ARG_TYPE', 'start', 'number', this.start)
+				throw new errors$1.TypeError('ERR_INVALID_ARG_TYPE', 'start', 'number', this.start)
 			}
 			if (this.start < 0) {
 				const errVal = `{start: ${this.start}}`;
-				throw new errors.RangeError('ERR_VALUE_OUT_OF_RANGE', 'start', '>= 0', errVal)
+				throw new errors$1.RangeError('ERR_VALUE_OUT_OF_RANGE', 'start', '>= 0', errVal)
 			}
 			this.pos = this.start;
 		}
@@ -1286,6 +1415,11 @@ class WriteStream extends stream.Writable {
 
 
 
+if (ReadStream.prototype.destroy === undefined)
+	ReadStream.prototype.destroy = ReadStream.prototype.close;
+if (WriteStream.prototype.destroy === undefined)
+	WriteStream.prototype.destroy = WriteStream.prototype.end;
+
 
 
 
@@ -1294,6 +1428,18 @@ function closeFsStream(stream$$1, cb, err) {
 		.catch(() => stream$$1.emit('close'))
 		.catch(er => cb(er || err));
 }
+
+function handleError(val, callback) {
+  if (val instanceof Error) {
+    if (typeof callback === 'function') {
+      process.nextTick(callback, val);
+      return true;
+    } else throw val;
+  }
+  return false;
+}
+
+
 
 
 
@@ -1335,38 +1481,54 @@ export async function _createReadStream(readable, args) {
 
 if (isUwp) {
 	var {FileIO} = Windows.Storage;
-	var {DataReader, DataWriter} = Windows.Storage.Streams;
+	var {DataReader: DataReader$1, DataWriter} = Windows.Storage.Streams;
 	var COLLISION = Windows.Storage.CreationCollisionOption;
 }
 
-async function readFile(path, encoding, callback) {
+var readFile = callbackify(async (path, options) => {
+	options = getOptions(options, {flag: 'r'});
+	//path = getPathFromURL(path)
+	//nullCheck(path)
+	var fd = await open(path);
+	//await read(fd)
+	//var storageFile = fds[fd]
+	//var iBuffer = await FileIO.readBufferAsync(storageFile)
+	//var result = bufferFromIbuffer(iBuffer)
+	var result = read(fd, 'TODO', 'TODO', 'TODO', 4);
+	// Close file descriptor
+	await close(fd);
+	return result
+});
+/*
+export async function readFile(path, encoding, callback) {
 	//callback = maybeCallback(callback || options)
 	//options = getOptions(options, { flag: 'r' })
 	//if (handleError((path = getPathFromURL(path)), callback)) return
 	//if (!nullCheck(path, callback)) return
 	// encoding is optional
 	if (typeof encoding === 'function') {
-		callback = encoding;
-		encoding = 'utf8';
+		callback = encoding
+		encoding = 'utf8'
 	}
-	var fd = reserveFd();
+	var fd = reserveFd()
 	try {
-		await _open$1(path, fd);
-		await _read(fd);
-		var storageFile = fds$1[fd];
-		var iBuffer = await FileIO.readBufferAsync(storageFile);
-		var result = bufferFromIbuffer(iBuffer);
+		await open(path, fd)
+		await read(fd)
+		var storageFile = fds[fd]
+		var iBuffer = await FileIO.readBufferAsync(storageFile)
+		var result = bufferFromIbuffer(iBuffer)
 		// Close file descriptor
-		await _close(fd);
-		if (callback) callback(null, result);
+		await close(fd)
+		if (callback) callback(null, result)
 		return result
 	} catch(err) {
 		// Ensure we're leaving no descriptor open
-		await _close(fd);
-		if (callback) callback(err);
+		await close(fd)
+		if (callback) callback(err)
 		throw err
 	}
 }
+*/
 /*
 export async function readFile(path, encoding, callback) {
 	// encoding is optional
@@ -1375,26 +1537,26 @@ export async function readFile(path, encoding, callback) {
 		encoding = 'utf8'
 	}
 	var fd = reserveFd()
-	return _readFile(fd, path, encoding)
+	return readFile(fd, path, encoding)
 		.then(result => {
 			if (callback) callback(null, result)
 			return result
 		})
 		.catch(err => {
 			// Ensure we're leaving no descriptor open
-			await _close(fd)
+			await close(fd)
 			if (callback) callback(err)
 			return err
 		})
 }
-_readFile(fd, path, encoding) {
-	await _open(path, fd)
-	await _read(fd)
+readFile(fd, path, encoding) {
+	await open(path, fd)
+	await read(fd)
 	var storageFile = fds[fd]
 	var iBuffer = await FileIO.readBufferAsync(storageFile)
 	var result = bufferFromIbuffer(iBuffer)
 	// Close file descriptor
-	await _close(fd)
+	await close(fd)
 	return result
 }*/
 
@@ -1405,7 +1567,7 @@ function isFd(path) {
 
 async function writeFile(path, data, encoding, callback) {
 	callback = maybeCallback(callback || options);
-	options = getOptions({encoding: 'utf8', mode: 0o666, flag: 'w'}, options);
+	options = getOptions(options, {encoding: 'utf8', mode: 0o666, flag: 'w'});
 
 	if (isFd(path)) {
 		writeFd(path, true);
@@ -1421,7 +1583,7 @@ async function writeFile(path, data, encoding, callback) {
 
 	//var fd = reserveFd()
 	try {
-		//fd = await _open(path)
+		//fd = await open(path)
 		var storageFile = await targetFolder.createFileAsync(fileName, COLLISION.replaceExisting);
 		if (typeof data === 'string') {
 			await FileIO.writeTextAsync(storageFile, data);
@@ -1431,7 +1593,7 @@ async function writeFile(path, data, encoding, callback) {
 		if (callback) callback(null);
 	} catch(err) {
 		// Ensure we're leaving no descriptor open
-		//await _close(fd)
+		//await close(fd)
 		if (callback) callback(err);
 		throw err
 	}
@@ -1479,13 +1641,13 @@ function createWriteStream(path, options) {
 }
 
 if (isUwp) {
-	var {StorageFolder: StorageFolder$2, StorageFile: StorageFile$2, AccessCache: AccessCache$1} = Windows.Storage;
+	var {StorageFolder: StorageFolder$2, StorageFile: StorageFile$2, AccessCache} = Windows.Storage;
 	var {QueryOptions, CommonFileQuery, FolderDepth} = Windows.Storage.Search;
 }
 
 //const errors = require('internal/errors');
 
-var errnoException$1 = util && util._errnoException || function(err, syscall, original) {
+var errnoException = util && util._errnoException || function(err, syscall, original) {
 	if (typeof err !== 'number' || err >= 0 || !Number.isSafeInteger(err))
 		throw new errors.TypeError('ERR_INVALID_ARG_TYPE', 'err', 'negative number')
 	const name = errname(err);
@@ -1508,7 +1670,7 @@ async function watch(path, options, listener) {
 	if (typeof options === 'function')
 		listener = options;
 
-	options = getOptions$1(options, {
+	options = getOptions(options, {
 		persistent: true,
 		recursive: false,
 	});
@@ -1608,7 +1770,7 @@ class FSWatcher extends EventEmitter {
 		//handleError((path = getPathFromURL(path)))
 		nullCheck(path);
 
-		_open$1(path).then(async fd => {
+		open(path).then(async fd => {
 			var storageFolder = fds$1[fd];
 
 			var options = new QueryOptions(CommonFileQuery.OrderByName, ['*']);
@@ -1659,7 +1821,7 @@ function symmetricDiff(arr1, arr2) {
 
 
 
-function handleError$2(val, callback) {
+function handleError$1(val, callback) {
 	if (val instanceof Error) {
 		if (typeof callback === 'function') {
 			process.nextTick(callback, val);
@@ -1670,50 +1832,65 @@ function handleError$2(val, callback) {
 }
 
 if (isUwp) {
-	var {Pickers} = Windows.Storage;
+	var {Pickers, AccessCache: AccessCache$1} = Windows.Storage;
+	var uwpStorageCache = AccessCache$1.StorageApplicationPermissions.futureAccessList;
+/*
+	const warnMessage = `UWP-FS does not have permission to access C:\\.
+	FS module might not behave as expected.
+	Use .uwpPickAndCacheDrive() to force user to give you the permission.`
+
+	async function fetchCachedDrives() {
+		var folderPromises = uwpStorageCache.entries
+			.map(entry => entry.token)
+			.map(token => uwpStorageCache.getItemAsync(token))
+		;(await Promise.all(folderPromises))
+			.filter(isFolderDrive)
+			.forEach(drive => {
+				var driveLetter = extractDrive(drive.path)
+				uwpDrives.set(driveLetter, drive)
+				uwpDrives.set(driveLetter.toUpperCase(), drive)
+			})
+		if (!uwpDrives.has('c')) {
+			console.warn(warnMessage)
+			setTimeout(() => console.warn(warnMessage), 1000)
+		}
+	}*/
 }
 
 async function uwpPickAndCacheDrive() {
 	var folder = await fs.uwpPickFolder();
-	if (folder === null) return
+	if (folder === null)
+		throw new Error(`Folder selection canceled`)
 	// Filter out ordinary folders because we need full access to the root (drives) to work properly
 	// like node APIs do.
-	if (!isFolderDrive(folder)) return
+	if (!isFolderDrive(folder))
+		throw new Error(`Selected folder is not a drive but just a subfolder '${folder.path}', 'fs' module will not work properly`)
 	// Application now has read/write access to all contents in the picked folder (including sub-folders)
-	var faToken = uwpStorageCache.add(folder);
+	uwpStorageCache.add(folder);
 	return folder
 }
 
 
 // viewMode sets what style the picker should have. Either 'list' or 'thumbnal'
 // startLocation sets where the picker should start.
-function applyPickerDefaultOptions(args) {
-	var [extensions, viewMode, startLocation] = args;
-	if (extensions === undefined) extensions = ['*'];
-	if (viewMode === undefined) viewMode = 'list';
-	if (startLocation === undefined) startLocation = 'desktop';
-	return [extensions, viewMode, startLocation]
-}
-
-function applyPickerOptions(picker, args) {
-	var [extensions, viewMode, startLocation] = applyPickerDefaultOptions(args);
-	picker.viewMode = Windows.Storage.Pickers.PickerViewMode[viewMode];
-	picker.suggestedStartLocation = Pickers.PickerLocationId[startLocation];
-	picker.fileTypeFilter.replaceAll(extensions);
+function applyPickerOptions(picker, ext = ['*'], mode = 'list', startLoc = 'desktop') {
+	picker.viewMode = Windows.Storage.Pickers.PickerViewMode[mode];
+	picker.suggestedStartLocation = Pickers.PickerLocationId[startLoc];
+	picker.fileTypeFilter.replaceAll(ext);
 	return picker
 }
 
 // Returns UWP StorageFolder
 function uwpPickFolder(...args) {
 	var picker = new Pickers.FolderPicker();
-	applyPickerOptions(picker, args);
+	applyPickerOptions(picker, ...args);
 	return picker.pickSingleFolderAsync()
 }
 
 // Returns UWP StorageFolder
 function uwpPickFile(...args) {
 	var picker = new Pickers.FileOpenPicker();
-	applyPickerOptions(picker, args);
+	applyPickerOptions(picker, ...args);
 	return picker.pickSingleFileAsync()
 }
 
@@ -1723,17 +1900,25 @@ function uwpPickFileSave(...args) {
 	picker.viewMode = Windows.Storage.Pickers.PickerViewMode[viewMode];
 }
 
+var _internals = {getPathFromURL};
+
+
 // TODO
 // - WHATWG URL - https://nodejs.org/api/fs.html#fs_whatwg_url_object_support
+
+// https://blogs.windows.com/buildingapps/2014/06/19/common-questions-and-answers-about-files-and-app-data-part-1-app-data/#rtHwpGGxeZGTbFF2.97
+// https://blogs.windows.com/buildingapps/2014/06/20/common-questions-and-answers-about-files-and-app-data-part-2-files/#ruU7x5z0PYWB7mez.97
 
 //import def from './src/index.mjs'
 //export default def
 
-exports.uwpSetCwdFolder = uwpSetCwdFolder;
-exports.uwpDrives = uwpDrives;
+exports._internals = _internals;
 exports.open = open;
 exports.close = close;
 exports.read = read;
+exports.stat = stat;
+exports.exists = exists;
+exports.uwpSetCwdFolder = uwpSetCwdFolder;
 exports.readdir = readdir;
 exports.readFile = readFile;
 exports.writeFile = writeFile;
