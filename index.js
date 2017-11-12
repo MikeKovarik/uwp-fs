@@ -1,8 +1,8 @@
 (function (global, factory) {
-	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('stream'), require('buffer'), require('node-web-streams-adapter'), require('events'), require('util')) :
-	typeof define === 'function' && define.amd ? define(['exports', 'stream', 'buffer', 'node-web-streams-adapter', 'events', 'util'], factory) :
-	(factory((global['uwp-fs'] = {}),global.stream,global.buffer,global['node-web-streams-adapter'],global.events,global.util));
-}(this, (function (exports,stream,buffer,nodeWebStreamsAdapter,EventEmitter,util) { 'use strict';
+	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('buffer'), require('stream'), require('events'), require('util')) :
+	typeof define === 'function' && define.amd ? define(['exports', 'buffer', 'stream', 'events', 'util'], factory) :
+	(factory((global['uwp-fs'] = {}),global.buffer,global.stream,global.events,global.util));
+}(this, (function (exports,buffer,stream,EventEmitter,util) { 'use strict';
 
 EventEmitter = EventEmitter && EventEmitter.hasOwnProperty('default') ? EventEmitter['default'] : EventEmitter;
 util = util && util.hasOwnProperty('default') ? util['default'] : util;
@@ -237,7 +237,11 @@ function getPathFromURL(path) {
 	else if (!path.includes(':\\'))
 		path = exports.cwd + '\\' + path;
 	// Normalize the path
-	return normalizeArray(path.split(/\\+/g)).join('\\')
+	var normalized = normalizeArray(path.split(/\\+/g)).join('\\');
+	if (normalized.endsWith(':'))
+		return normalized + '\\'
+	else
+		return normalized
 }
 
 function normalizeArray(parts) {
@@ -353,7 +357,7 @@ function processError(err, syscall, path, storageObjectType) {
 }
 
 if (isUwp) {
-	var {StorageFolder, StorageFile, FileAccessMode: FileAccessMode$1} = Windows.Storage;
+	var {StorageFolder, StorageFile, FileAccessMode} = Windows.Storage;
 	var {DataReader} = Windows.Storage.Streams;
 }
 
@@ -361,30 +365,42 @@ if (isUwp) {
 // First three FDs are taken by stdin, stdout, stderr (and are inaccessible in UWP).
 // Warning: If process uses more than three basic FDs (like forked process with 'ipc' channel)
 //          than the first number of FDs won't match (this module will always start at fd 3)
-var fds$1 = [null, null, null];
+var fds = [null, null, null];
 
 function findEmpyFd() {
-	for (var i = 2; i < fds$1.length; i++)
-		if (fds$1[i] === undefined) return i
-	return fds$1.length
+	for (var i = 2; i < fds.length; i++)
+		if (fds[i] === undefined) return i
+	return fds.length
 }
 
 function clearFd(fd) {
-	if (fd === fds$1.length - 1)
-		fds$1.length--;
-	else if (fd < fds$1.length)
-		fds$1[fd] = undefined;
+	if (fd === fds.length - 1)
+		fds.length--;
+	else if (fd < fds.length)
+		fds[fd] = undefined;
 }
 
 function reserveFd() {
 	var fd = findEmpyFd();
-	fds$1[fd] = null;
+	fds[fd] = null;
 	return fd
 }
 
 
 
-
+/*
+'r'   Open file for reading. An exception occurs if the file does not exist.
+'r+'  Open file for reading and writing. An exception occurs if the file does not exist.
+'rs+' Open file for reading and writing in synchronous mode. Instructs the operating system to bypass the local file system cache.
+'w'   Open file for writing. The file is created (if it does not exist) or truncated (if it exists).
+'wx'  Like 'w' but fails if path exists.
+'w+'  Open file for reading and writing. The file is created (if it does not exist) or truncated (if it exists).
+'wx+' Like 'w+' but fails if path exists.
+'a'   Open file for appending. The file is created if it does not exist.
+'ax'  Like 'a' but fails if path exists.
+'a+'  Open file for reading and appending. The file is created if it does not exist.
+'ax+' Like 'a+' but fails if path exists.
+*/
 var open = callbackify(async (path, flags = 'r', mode = 0o666) => {
 	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
 	path = getPathFromURL(path);
@@ -394,19 +410,22 @@ var open = callbackify(async (path, flags = 'r', mode = 0o666) => {
 	var storageObject = await openStorageObject(path, 'open');
 
 	var folder, file, stream$$1, reader, writer;
-	if (storageObject.constructor === StorageFolder) {
-		folder = storageObject;
-	}
 
-	if (storageObject.constructor === StorageFile) {
+	if (storageObject.constructor === StorageFolder)
+		folder = storageObject;
+	if (storageObject.constructor === StorageFile)
 		file = storageObject;
+
+	if (file !== undefined) {
 		// Open file's read stream
 		// TODO: wrap in try/catch and handle errors
-		stream$$1 = await storageObject.openAsync(FileAccessMode$1.read);
+		stream$$1 = await storageObject.openAsync(FileAccessMode.read);
 		if (!window.iStream)
 			window.iStream = stream$$1;
-		if (flags.includes('r'))
+		if (flags.includes('r')) {
 			var reader = new DataReader(stream$$1);
+			reader.inputStreamOptions = InputStreamOptions.partial;
+		}
 		if (flags === 'r+')
 			writer = 'TODO';
 		//FileAccessMode.read
@@ -414,9 +433,28 @@ var open = callbackify(async (path, flags = 'r', mode = 0o666) => {
 	}
 
 	var fd = reserveFd();
-	fds$1[fd] = {file, folder, storageObject, stream: stream$$1, reader, writer, path};
+	fds[fd] = {file, folder, storageObject, stream: stream$$1, reader, writer, path};
 	return fd
 });
+
+
+var unlink = callbackify(async path => {
+});
+
+
+var mkdir = callbackify(async path => {
+});
+
+
+// syscall used in: readdir
+async function _scandir(path, fd) {
+	// Find empty fd number (slot for next descriptor we are about to open).
+	if (fd === undefined)
+		fd = findEmpyFd();
+	// Try to get folder descriptor for given path and store it to the empty slot.
+	fds[fd] = await openStorageFolder(path, 'scandir');
+	return fd
+}
 
 
 /*
@@ -428,24 +466,28 @@ Read data from the file specified by 'fd'.
 The callback is given the three arguments, '(err, bytesRead, buffer)'.
 */
 async function _read(fd, buffer$$1, offset, length, position) {
-	//throw new errors.RangeError('Length extends beyond buffer')
-	if (position < 0)
+	// NOTE: Order of these errors matter. Do not change.
+	if (buffer$$1 === undefined || !Buffer.isBuffer(buffer$$1))
+		throw new errors$1.TypeError('Second argument needs to be a buffer')
+	// note: position -1 means don't move to any position, start reading where we left off last time.
+	if (position < -1)
 		throw syscallException('EINVAL', 'read')
 	if (offset < 0 || offset > buffer$$1.length)
 		throw new errors$1.Error('Offset is out of bounds')
 	if (offset + length > buffer$$1.length)
 		throw new errors$1.RangeError('Length extends beyond buffer')
-
-	var {stream: stream$$1, reader} = fds$1[fd];
+	var {file, folder, stream: stream$$1, reader} = fds[fd];
+	if (file === undefined && folder !== undefined)
+		throw syscallException('EISDIR', 'read')
+	if (position > stream$$1.size)
+		return {bytesRead: 0, buffer: buffer$$1}
 
 	// Set position where to begin reading from in the file.
-	if (position !== null)
+	if (position !== null && position !== -1)
 		stream$$1.seek(position);
 	// Assess the ammount of bytes we want to read.
 	//var bytesToRead = length || stream.size
 	var bytesToRead = Math.min(stream$$1.size - position, length);
-	console.log('should read', length);
-	console.log('will read', bytesToRead);
 	// Request to read that ammount of bytes, but but ready to comply to UWP's restictions.
     var bytesRead = await reader.loadAsync(bytesToRead);
 	//var bytesRead = reader.unconsumedBufferLength
@@ -473,7 +515,7 @@ function read(fd, buffer$$1, offset, length, position, callback) {
 
 
 var close = callbackify(async fd => {
-	var content = fds$1[fd];
+	var content = fds[fd];
 	if (typeof fd === 'number') clearFd(fd);
 	if (!content) return
 	var {file, folder, stream: stream$$1, reader, writer} = content;
@@ -487,6 +529,7 @@ var close = callbackify(async fd => {
 		stream$$1.close();
 });
 
+
 var exists = callbackify(async path => {
 	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
 	path = getPathFromURL(path);
@@ -495,13 +538,13 @@ var exists = callbackify(async path => {
 		await openStorageObject(path);
 		return true
 	} catch(err) {
-		console.log(err);
-		if (err.code === 'ENOENT')
-			return false
-		else
+		if (err.code !== 'ENOENT')
 			throw err
+		return false
 	}
 });
+
+
 
 var stat = callbackify(async path => {
 	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
@@ -515,39 +558,6 @@ var stat = callbackify(async path => {
 	await stats._ready;
 	return stats
 });
-
-
-
-// syscall used in: readdir
-async function _scandir(path, fd) {
-	// Find empty fd number (slot for next descriptor we are about to open).
-	if (fd === undefined)
-		fd = findEmpyFd();
-	// Try to get folder descriptor for given path and store it to the empty slot.
-	fds$1[fd] = await openStorageFolder(path, 'scandir');
-	return fd
-}
-
-/*
-// syscall used in: open
-export async function _open(path, fd) {
-	// Find empty fd number (slot for next descriptor we are about to open).
-	if (fd === undefined)
-		fd = reserveFd()
-	// Try to get file or folder descriptor for given path and store it to the empty slot.
-	fds[fd] = await openStorageObject(path, 'open')
-	return fd
-}
-
-export async function _read(fd) {
-	var storageObject = fds[fd]
-	if (storageObject.constructor === StorageFolder)
-		throw syscallException('EISDIR', 'read')
-	return fd
-}
-*/
-
-
 
 const DATE_ACCESSED = 'System.DateAccessed';
 
@@ -616,7 +626,7 @@ async function readdir(path, callback) {
 	var fd = reserveFd();
 	try {
 		await _scandir(path, fd);
-		var storageFolder = fds$1[fd];
+		var storageFolder = fds[fd];
 		var result = (await storageFolder.getItemsAsync())
 			.map(getNames)
 			.sort();
@@ -642,595 +652,6 @@ function getNames(storageFile) {
 	return storageFile.name
 }
 
-var defaultChunkSize = 1024 * 1024; // 1 MB
-
-function getHighWaterMark(options) {
-	// HighWaterMark is limitting how large chunks we can read.
-	return options.highWaterMark || options.chunkSize || defaultChunkSize
-}
-
-// Creating local variables out of globals so that we can safely use them (in conditions)
-// and not throw errors.
-var self = typeof self === 'undefined' ? typeof global === 'object' ? global : window : self;
-// Node.js APIs
-var Blob = self.Blob;
-var File = self.File;
-var FileReader = self.FileReader;
-var ArrayBuffer = self.ArrayBuffer;
-var Uint8Array = self.Uint8Array;
-var ReadableStream = self.ReadableStream;
-var WritableStream = self.WritableStream;
-
-var nextTick = process.nextTick || self.setImediate || sel.setTimeout;
-
-function noop() {}
-
-var isNativeNode = typeof process === 'object' && process.versions.node;
-
-function isTypedArray(arr) {
-	return arr instanceof Uint8Array
-		|| arr instanceof Uint8ClampedArray
-		|| arr instanceof Int8Array
-		|| arr instanceof Uint16Array
-		|| arr instanceof Int16Array
-		|| arr instanceof Uint32Array
-		|| arr instanceof Int32Array
-		|| arr instanceof Float32Array
-		|| arr instanceof Float64Array
-}
-
-var originalBufferFrom = buffer.Buffer ? buffer.Buffer.from : undefined;
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////// Node.js Buffer ////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-function bufferFromTypedArray(array = this) {
-	if (array instanceof Uint8Array) {
-		return originalBufferFrom(array)
-	} else {
-		throw new Error('Buffer.fromTypedArray does not implement other types than Uint8Array')
-	}
-	// TODO
-}
-
-function bufferFromArrayBuffer(arrayBuffer = this) {
-	if (isNativeNode)
-		return originalBufferFrom(new Uint8Array(arrayBuffer))
-	else
-		return originalBufferFrom(arrayBuffer)
-}
-
-// returns promise
-function bufferFromBlob(blob = this) {
-	return new Promise((resolve, reject) => {
-		var reader = new FileReader();
-		reader.onload = e => {
-			var buffer$$1 = bufferFromArrayBuffer(reader.result);
-			resolve(buffer$$1);
-		};
-		reader.readAsArrayBuffer(blob);
-	})
-}
-
-// returns promise with the buffer as a callback argument
-function bufferFromReadable(stream$$1 = this) {
-	return new Promise((resolve, reject) => {
-		var chunks = [];
-		stream$$1.on('data', data => chunks.push(data));
-		stream$$1.on('end', () => resolve(buffer.Buffer.concat(chunks)));
-	})
-}
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////// Uint8Array ////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////// ArrayBuffer ///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-function arrayBufferFromBuffer(buffer$$1 = this) {
-	return (new Uint8Array(buffer$$1)).buffer
-}
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////// Blob / File ///////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-class UnderlyingSourceWrapper {
-
-	// Called by instantiatior with new data to be used in stream.
-	// Adapter can be used by either Readable or ReadableStream which then call start/pull/cancel
-	// on its own from inside, so constructor is the only way we can set up data for those methods.
-	constructor(source) {
-		this.source = source;
-	}
-
-	// Called by the stream from inside to signal that we're starting to read some data into the stream
-	// And we can now prepare and instantiate what's needed.
-	start(controller) {
-		// Size of the read data and current position inside it.
-		this.size = this.source.size || Infinity;
-		this.offset = 0;
-		if (this._start)
-			return this._start(controller)
-	}
-
-	// Each time we read a chunk from the blob, convert it to buffer and push it to the stream.
-	async pull(controller) {
-		console.log('pull', this.offset, '/', this.size);
-		// End the stream if we reached the end of the blob and this was the last chunk.
-		if (this.offset >= this.size)
-			return controller.close()
-		try {
-			// Read chunk from underlying source
-			var chunk = await this._pull(controller);
-			// bytesRead
-			this.offset += chunk.length;
-			// Push the read chunk into our stream.
-			controller.enqueue(chunk);
-		} catch(err) {
-			controller.error(err);
-		}
-	}
-
-
-	// Handle cancelation of the stream safely by stopping reader.
-	cancel(reason) {
-		this._cancel(reason);
-	}
-
-}
-
-
-
-
-class UnderlyingSinkWrapper {
-
-	constructor(source) {
-		console.warn('TO BE IMPLEMENTED: UnderlyingSinkWrapper');
-	}
-
-	start(controller) {
-	}
-
-	write(chunk, controller) {
-	}
-
-	close() {
-	}
-
-	abort(reason) {
-	}
-
-}
-
-function promisifyFileReader(reader) {
-	return new Promise((resolve, reject) => {
-		reader.onload = resolve;
-		reader.onerror = reject;
-		reader.onabort = reject;
-	})
-}
-
-class FileReaderAdapterFromBlob extends UnderlyingSourceWrapper {
-/*
-	// By default 
-	chunkConvertor(chunk) {
-		return new Uint8Array(chunk)
-	}
-*/
-	_start(controller) {
-		// Open browser's FileReader class needed for accesing binary data from blob.
-		this.reader = new FileReader();
-	}
-
-	_cancel(reason) {
-		this.reader.abort();
-	}
-
-	async _pull({desiredSize}) {
-		// Limit the ammount of bytes to read to what the stream is capable of accepting now.
-		var bytesToRead = Math.min(this.size - this.offset, desiredSize);
-		// Extract the chunk of 'bytesToRead' size, starting at 'offset'.
-		var blobChunk = this.source.slice(this.offset, this.offset + bytesToRead);
-		// And let reader turn the chunk info ArrayBuffer (onload gets called).
-		this.reader.readAsArrayBuffer(blobChunk);
-		// Wrap filereader instance into promise that resolves after the chunk is read,
-		// after the reader.onload callback is called.
-		await promisifyFileReader(this.reader);
-		// By default FileReader returns browser's ArrayBuffer that we need to convert to node Buffer.
-		return this.reader.result
-	}
-
-}
-
-class ReadableFileReaderAdapterFromBlob extends FileReaderAdapterFromBlob {
-	async _pull(controller) {
-		return new buffer.Buffer.from(await super._pull(controller))
-	}
-}
-function readableFromBlob(blob = this, options = {}) {
-	var underlyingSource = new ReadableFileReaderAdapterFromBlob(blob);
-	return new nodeWebStreamsAdapter.ReadableStreamAdapter(underlyingSource, options)
-}
-
-class ReadableStreamFileReaderAdapterFromBlob extends FileReaderAdapterFromBlob {
-	async _pull(controller) {
-		return new Uint8Array(await super._pull(controller))
-	}
-}
-function readableStreamFromBlob(blob = this, options = {}) {
-	var underlyingSource = new ReadableStreamFileReaderAdapterFromBlob(blob);
-	return new ReadableStream(underlyingSource, options)
-}
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////// Node.js stream.Readable ///////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-// Unversal instantiator of Node.js stream.Readable class from anything thrown at it
-function readableFrom(input, ...args) {
-	if (buffer.Buffer.isBuffer(input)) {
-		return readableFromBuffer(input)
-	} else if (Array.isArray(input) || typeof input === 'string') {
-		return readableFromBuffer(originalBufferFrom(input))
-	} else if (isTypedArray(input)) {
-		return readableFromTypedArray(input)
-	} else if (input instanceof ArrayBuffer) {
-		return readableFromArrayBuffer(input)
-	} else if (input instanceof Blob) {
-		return readableFromBlob(input, ...args)
-	} else if (input instanceof stream.Readable) {
-		return input
-	}
-}
-
-// TODO: turn this into backpressured stream
-function readableFromBuffer(buffer$$1 = this, options = {}) {
-	var highWaterMark = getHighWaterMark(options);
-	const stream$$1 = new stream.Readable({highWaterMark});
-	// We're not reading from any special source so we're not using noop, despite having to define it
-	stream$$1._read = noop;
-	stream$$1.push(buffer$$1);
-	// end the stream
-	stream$$1.push(null);
-	return stream$$1
-}
-
-function readableFromTypedArray(array = this) {
-	var buffer$$1 = bufferFromTypedArray(array);
-	return readableFromBuffer(buffer$$1)
-}
-
-function readableFromArrayBuffer(arrayBuffer) {
-	var buffer$$1 = bufferFromArrayBuffer(arrayBuffer);
-	return readableFromBuffer(buffer$$1)
-}
-
-function readableFromReadableStream(readableStream = this) {
-	var readable = new stream.Readable;
-	_readableFromReadableStream(readable, readableStream);
-	return readable
-}
-async function _readableFromReadableStream(readable, source) {
-	console.warn('TODO: reimplement readableFromReadableStream using adapters');
-	// TODO backpressure
-	readable._read = function () {};
-	var reader = source.getReader();
-	while (true) {
-		let {value, done} = await reader.read();
-		/// NOTE: valus is probably Uint8Array and needs to be converted to buffer
-		let chunk = new Uint8Array(value);
-		readable.push(chunk);
-		if (done) break
-	}
-	readable.push(null);
-}
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////// WHATWG ReadableStream /////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-// Unversal instantiator of WHATWG ReadableStream class from anything thrown at it
-function readableStreamFrom(input, ...args) {
-	/*if (Buffer.isBuffer(input)) {
-	} else if (Array.isArray(input) || typeof input === 'string') {
-	} else if (isTypedArray(input)) {
-	} else if (input instanceof ArrayBuffer) {
-	} else */if (input instanceof Blob) {
-		return readableStreamFromBlob(input, ...args)
-	}
-}
-
-function readableStreamFromBuffer(buffer$$1 = this, options = {}) {
-	console.warn('TODO: reimplement readableStreamFromBuffer using BYOB');
-	// If options is not an object, it was probably used inside .map() which supplies two arguments
-	if (typeof options !== 'object') options = {};
-	var offset = 0;
-	var highWaterMark = getHighWaterMark(options);
-	//var queuingStrategy = new CountQueuingStrategy({highWaterMark})
-	// Create instance of the stream
-	return new ReadableStream({
-		pull(controller) {
-			// Only read chunk of desired ammount of bytes from the whole file/blob
-            // NOTE: controller.desiredSize is never larger than highWaterMark
-			var bytesToRead = Math.min(size - offset, controller.desiredSize);
-			// Extract the chunk of 'bytesToRead' size, starting at 'offset'.
-			var chunk = buffer$$1.slice(offset, offset + bytesToRead);
-			offset += bytesToRead;
-			controller.enqueue(chunk);
-			if (offset >= size)
-				controller.close();
-		},
-	}, {highWaterMark})
-	//}, queuingStrategy)
-}
-
-function readableStreamFromTypedArray(array = this) {
-	// TODO
-	console.warn('readableStreamFromTypedArray not implemented yet');
-}
-
-function readableStreamFromArrayBuffer(arrayBuffer = this) {
-	// TODO
-	console.warn('readableStreamFromArrayBuffer not implemented yet');
-}
-
-function readableStreamFromReadable(readable = this) {
-	// TODO
-	console.warn('readableStreamFromReadable not implemented yet');
-}
-
-if (typeof Windows === 'object') {
-	var {DataReader: DataReader$2, DataWriter: DataWriter$1, InputStreamOptions} = Windows.Storage.Streams;
-}
-
-
-
-
-
-class UwpStreamSource extends UnderlyingSourceWrapper {
-
-	// Allocates enough space in newly created chunk buffer.
-	alloc(size) {
-		return new Uint8Array(size)
-	}
-
-	_start(controller) {
-		// Instantiate UWP DataReader from the input stream
-		this.reader = new DataReader$2(this.source);
-		// Makes the stream available for reading (loadAsync) whenever there are any data,
-		// no matter how much. Without it, the reader would wait for all of the 'desiredSize'
-		// to be in the stream first, before it would let us read it all at once.
-		this.reader.inputStreamOptions = InputStreamOptions.partial;
-	}
-
-	async _pull({desiredSize}) {
-		//
-		var bytesRead = await this.reader.loadAsync(desiredSize);
-		// Create Buffer of the size that we know is ready for use to read from the stream.
-		var chunk = this.alloc(bytesRead);
-		// Now read the data from the stream into the chunk buffe we've just created.
-		this.reader.readBytes(chunk);
-	}
-
-	_cancel(reason) {
-		this.reader.close();
-	}
-
-}
-
-
-class UwpStreamSink extends UnderlyingSinkWrapper {
-
-	// Allocates enough space in newly created chunk buffer.
-	alloc(size) {
-		return new Uint8Array(size)
-	}
-
-	_start(controller) {
-		// Instantiate UWP DataReader from the input stream
-		this.reader = new DataReader$2(this.source);
-		// Makes the stream available for reading (loadAsync) whenever there are any data,
-		// no matter how much. Without it, the reader would wait for all of the 'desiredSize'
-		// to be in the stream first, before it would let us read it all at once.
-		this.reader.inputStreamOptions = InputStreamOptions.partial;
-	}
-
-	async _pull({desiredSize}) {
-		//
-		var bytesRead = await this.reader.loadAsync(desiredSize);
-		// Create Buffer of the size that we know is ready for use to read from the stream.
-		var chunk = this.alloc(bytesRead);
-		// Now read the data from the stream into the chunk buffe we've just created.
-		this.reader.readBytes(chunk);
-	}
-
-	_cancel(reason) {
-		this.reader.close();
-	}
-
-}
-
-
-function readableFromUwpStream(uwpStream = this, options = {}) {
-	var underlyingSource = new UwpStreamSource(uwpStream);
-	underlyingSource.alloc = size => buffer.Buffer.allocUnsafe(size);
-	return new nodeWebStreamsAdapter.ReadableStreamAdapter(underlyingSource, options)
-}
-
-function readableStreamFromUwpStream(uwpStream = this, options = {}) {
-	var underlyingSource = new UwpStreamSource(uwpStream);
-	underlyingSource.alloc = size => new Uint8Array(size);
-	return new ReadableStream(underlyingSource, options)
-}
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-function bufferFromIbuffer(iBuffer) {
-	// Note this is not a custom extension of DataReader class but builtin method
-	// that accepts UWP IBuffer.
-	var reader = DataReader$2.fromBuffer(iBuffer);
-	var byteSize = reader.unconsumedBufferLength;
-	var nodeBuffer = buffer.Buffer.allocUnsafe(byteSize);
-	var data = reader.readBytes(nodeBuffer);
-	reader.close();
-	return nodeBuffer
-}
-
-if (stream.Readable) {
-	// Statics
-	stream.Readable.from               = readableFrom;
-	stream.Readable.fromBuffer         = readableFromBuffer;
-	stream.Readable.fromTypedArray     = readableFromTypedArray;
-	stream.Readable.fromArrayBuffer    = readableFromArrayBuffer;
-	stream.Readable.fromFile           = readableFromBlob;
-	stream.Readable.fromBlob           = readableFromBlob;
-	stream.Readable.fromReadableStream = readableFromReadableStream;
-	// Instance methods
-	stream.Readable.prototype.toBuffer = bufferFromReadable;
-}
-
-// Node.js stream.Writable
-if (stream.Writable) {
-}
-
-// WHATWG ReadableStream
-if (ReadableStream) {
-	ReadableStream.from            = readableStreamFrom;
-	ReadableStream.fromBuffer      = readableStreamFromBuffer; // TODO
-	ReadableStream.fromTypedArray  = readableStreamFromTypedArray; // TODO
-	ReadableStream.fromArrayBuffer = readableStreamFromArrayBuffer; // TODO
-	ReadableStream.fromFile        = readableStreamFromBlob;
-	ReadableStream.fromBlob        = readableStreamFromBlob;
-	ReadableStream.fromReadable    = readableStreamFromReadable; // TODO
-	// Instance methods
-	ReadableStream.prototype.toReadable = readableFromReadableStream;
-}
-
-// WHATWG WritableStream
-if (WritableStream) {
-}
-
-if (buffer.Buffer) {
-	// Statics
-	buffer.Buffer.fromReadable     = bufferFromReadable;
-	buffer.Buffer.fromTypedArray   = bufferFromTypedArray;
-	buffer.Buffer.fromArrayBuffer  = bufferFromArrayBuffer;
-	buffer.Buffer.fromBlob         = bufferFromBlob;
-	// Instance methods
-	buffer.Buffer.prototype.toReadable       = readableFromBuffer;
-	buffer.Buffer.prototype.toReadableStream = readableStreamFromBuffer;
-}
-
-if (Uint8Array) {
-	// Static
-	//Uint8Array.fromBuffer = typedArrayFromBuffer
-	// Instance methods
-	Uint8Array.prototype.toBuffer         = bufferFromTypedArray;
-	Uint8Array.prototype.toReadable       = readableFromTypedArray;
-	Uint8Array.prototype.toReadableStream = readableStreamFromTypedArray;
-}
-
-if (ArrayBuffer) {
-	// Static
-	ArrayBuffer.fromBuffer = arrayBufferFromBuffer;
-	// Instance methods
-	ArrayBuffer.prototype.toBuffer         = bufferFromArrayBuffer;
-	ArrayBuffer.prototype.toReadable       = readableFromArrayBuffer;
-	ArrayBuffer.prototype.toReadableStream = readableStreamFromArrayBuffer;
-}
-
-if (Blob && File) {
-	// Static
-	// ???
-	// Instance methods
-	File.prototype.toBuffer =
-	Blob.prototype.toBuffer = bufferFromBlob;
-	File.prototype.toReadable =
-	Blob.prototype.toReadable = function(...args) {
-		return readableFromBlob(this, ...args)
-	};
-	File.prototype.toReadableStream =
-	Blob.prototype.toReadableStream = function(...args) {
-		return readableStreamFromBlob(this, ...args)
-	};
-}
-
-
-
-
-
-
-
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-function promisifyWritable(stream$$1 = this) {
-	var promise = new Promise((resolve, reject) => {
-		stream$$1.on('close', resolve);
-		stream$$1.on('error', reject);
-	});
-	stream$$1.then = promise.then.bind(promise);
-	stream$$1.catch = promise.catch.bind(promise);
-	return stream$$1
-}
-
-function promisifyReadable(stream$$1 = this) {
-	var chunks = [];
-	var promise = new Promise((resolve, reject) => {
-		stream$$1.on('data', chunk => chunks.push(chunk));
-		stream$$1.on('end', () => resolve(buffer.Buffer.concat(chunks)));
-		stream$$1.on('error', reject);
-	});
-	stream$$1.then = promise.then.bind(promise);
-	stream$$1.catch = promise.catch.bind(promise);
-	return stream$$1
-}
-
-if (false) {
-	//Duplex.prototype.promisify =
-	stream.Writable.prototype.promisify = promisifyWritable;
-	//Duplex.prototype.promisify =
-	stream.Readable.prototype.promisify = promisifyReadable;
-}
-
-function promisify(input) {
-	if (input instanceof stream.Writable) {
-		return promisifyWritable(input)
-	} else if (input instanceof stream.Readable) {
-		return promisifyReadable(input)
-	}
-}
-
 var defaultReadStreamOptions = {
 	highWaterMark: 64 * 1024,
 	fd: null,
@@ -1247,7 +668,6 @@ var defaultWriteStreamOptions = {
 };
 
 
-
 var pool;
 
 function allocNewPool(poolSize) {
@@ -1260,7 +680,7 @@ class ReadStream extends stream.Readable {
 	constructor(path, options = {}) {
 		options = Object.assign({}, defaultReadStreamOptions, options);
 		super(options);
-		handleError((this.path = getPathFromURL(path)));
+		this.path = getPathFromURL(path);
 		Object.assign(this, options);
 		this.pos = undefined;
 		this.bytesRead = 0;
@@ -1377,7 +797,7 @@ class WriteStream extends stream.Writable {
 	constructor(path, options = {}) {
 		options = Object.assign({}, options);
 		super(options);
-		handleError((this.path = getPathFromURL(path)));
+		this.path = getPathFromURL(path);
 		Object.assign(this, options);
 		this.pos = undefined;
 		this.bytesWritten = 0;
@@ -1405,6 +825,9 @@ class WriteStream extends stream.Writable {
 				this.destroy();
 		});
 	}
+
+	// TODO
+
 }
 
 
@@ -1429,56 +852,6 @@ function closeFsStream(stream$$1, cb, err) {
 		.catch(er => cb(er || err));
 }
 
-function handleError(val, callback) {
-  if (val instanceof Error) {
-    if (typeof callback === 'function') {
-      process.nextTick(callback, val);
-      return true;
-    } else throw val;
-  }
-  return false;
-}
-
-
-
-
-
-
-function createReadStream$1(path) {
-	var readable = new stream.Readable;
-	_createReadStream(readable, path);
-	return readable
-}
-async function _createReadStream(readable, path) {
-	var fd = await _open(path, fd);
-	// Access UWP's File object
-	var file = fds[fd];
-	// Open file's read stream
-	var uwpStream = await file.openAsync(FileAccessMode.read);
-	// Transform UWP stream indo Node's Readable
-	readableFromUwpStream(uwpStream, {readable});
-}
-
-/*
-export function createReadStream(...args) {
-	console.log('createReadStream', ...args)
-	var readable = new Readable
-	_createReadStream(readable, args)
-	return readable
-}
-export async function _createReadStream(readable, args) {
-	var uwpFolder = getFolder(args)
-	var [filePath, options] = args
-	var [targetFolder, fileName] = await accessUwpFolder(uwpFolder, filePath)
-	// Access UWP's File object
-	var file = await targetFolder.getFileAsync(fileName)
-	// Open file's read stream
-	var uwpStream = await file.openAsync(FileAccessMode.read)
-	// Transform UWP stream indo Node's Readable
-	readableStreamFromUwpStream(uwpStream, {readable})
-}
-*/
-
 if (isUwp) {
 	var {FileIO} = Windows.Storage;
 	var {DataReader: DataReader$1, DataWriter} = Windows.Storage.Streams;
@@ -1486,18 +859,56 @@ if (isUwp) {
 }
 
 var readFile = callbackify(async (path, options) => {
-	options = getOptions(options, {flag: 'r'});
-	//path = getPathFromURL(path)
-	//nullCheck(path)
-	var fd = await open(path);
-	//await read(fd)
-	//var storageFile = fds[fd]
-	//var iBuffer = await FileIO.readBufferAsync(storageFile)
-	//var result = bufferFromIbuffer(iBuffer)
-	var result = read(fd, 'TODO', 'TODO', 'TODO', 4);
-	// Close file descriptor
-	await close(fd);
-	return result
+
+	// NOTE: it's really 'flag' and not 'flags' like it's in fs.open
+	options = getOptions(options, {encoding: null, flag: 'r'});
+
+	var isUserFd = isFd(path);
+	var fd = isUserFd ? path : await open(path, options.flag);
+
+	// Access descriptor to avoid creating an fs.Stats instance for our internal use.
+	var {stream: stream$$1} = fds[fd];
+	// Get the size of the file (or folder).
+	var size = stream$$1 ? stream$$1.size : 0;
+	// Throw errors if the size is invalid.
+	//if (size === 0)
+	//	return Buffer.alloc(0)
+	if (size > buffer.kMaxLength) {
+		err = new RangeError('File size is greater than possible Buffer: ' + `0x${buffer.kMaxLength.toString(16)} bytes`);
+		close(fd);
+		throw err
+	}
+
+	try {
+		// Try to allocate enough memory for the size of the file.
+		var buffer$$1 = buffer.Buffer.allocUnsafe(size);
+		// Read (repeatedly if needed) the file into previously allocated buffer.
+		var offset = 0;
+		// Do at least one iteration (even for folders) because read syscall can handle and  fire additional errors.
+		do {
+			let {bytesRead} = await _read(fd, buffer$$1, offset, size, -1);
+			offset += bytesRead;
+			// Break the loop in case we're unable to read anything.
+			if (bytesRead === 0)
+				break
+		} while (offset < size)
+	} catch (err) {
+		// All the errors received here should be already in the Node-like format and we can
+		// rethrow them after we safely close the file's fd.
+		close(fd);
+		throw err
+	}
+
+	// File sucessfully read. Close file descriptor and return filled buffer.
+	if (!isUserFd)
+		await close(fd);
+
+	// TODO: Investigate if some work needs to be done on our side (or if the buffer module handles it)
+	if (options.encoding !== null)
+		return buffer$$1.toString(options.encoding)
+	else
+		return buffer$$1
+
 });
 /*
 export async function readFile(path, encoding, callback) {
@@ -1565,18 +976,16 @@ function isFd(path) {
 	return (path >>> 0) === path;
 }
 
-async function writeFile(path, data, encoding, callback) {
+async function writeFile(path, data, encoding) {
 	callback = maybeCallback(callback || options);
 	options = getOptions(options, {encoding: 'utf8', mode: 0o666, flag: 'w'});
 
-	if (isFd(path)) {
-		writeFd(path, true);
-		return
-	}
+	if (isFd(path))
+		var fd = path;
+	else
+		var fd = await fs.open(path, options.flag, options.mode);
 
-	fs.open(path, options.flag, options.mode)
-		.then(fd => writeFd(fd, false))
-		.catch(openErr => callback(openErr));
+	await writeFd(fd, true);
 
 	function writeFd(fd, isUserFd) {
 	}
@@ -1771,7 +1180,7 @@ class FSWatcher extends EventEmitter {
 		nullCheck(path);
 
 		open(path).then(async fd => {
-			var storageFolder = fds$1[fd];
+			var storageFolder = fds[fd];
 
 			var options = new QueryOptions(CommonFileQuery.OrderByName, ['*']);
 			options.folderDepth = FolderDepth.deep;
@@ -1821,7 +1230,7 @@ function symmetricDiff(arr1, arr2) {
 
 
 
-function handleError$1(val, callback) {
+function handleError(val, callback) {
 	if (val instanceof Error) {
 		if (typeof callback === 'function') {
 			process.nextTick(callback, val);
@@ -1925,28 +1334,6 @@ exports.writeFile = writeFile;
 exports.createReadStream = createReadStream;
 exports.createWriteStream = createWriteStream;
 exports.watch = watch;
-exports.defaultChunkSize = defaultChunkSize;
-exports.originalBufferFrom = originalBufferFrom;
-exports.bufferFromTypedArray = bufferFromTypedArray;
-exports.bufferFromArrayBuffer = bufferFromArrayBuffer;
-exports.bufferFromBlob = bufferFromBlob;
-exports.bufferFromReadable = bufferFromReadable;
-exports.arrayBufferFromBuffer = arrayBufferFromBuffer;
-exports.readableFromBlob = readableFromBlob;
-exports.readableStreamFromBlob = readableStreamFromBlob;
-exports.readableFrom = readableFrom;
-exports.readableFromBuffer = readableFromBuffer;
-exports.readableFromTypedArray = readableFromTypedArray;
-exports.readableFromArrayBuffer = readableFromArrayBuffer;
-exports.readableFromReadableStream = readableFromReadableStream;
-exports.readableStreamFrom = readableStreamFrom;
-exports.readableStreamFromBuffer = readableStreamFromBuffer;
-exports.readableStreamFromTypedArray = readableStreamFromTypedArray;
-exports.readableStreamFromArrayBuffer = readableStreamFromArrayBuffer;
-exports.readableStreamFromReadable = readableStreamFromReadable;
-exports.readableFromUwpStream = readableFromUwpStream;
-exports.readableStreamFromUwpStream = readableStreamFromUwpStream;
-exports.bufferFromIbuffer = bufferFromIbuffer;
 exports.uwpPickAndCacheDrive = uwpPickAndCacheDrive;
 exports.uwpPickFolder = uwpPickFolder;
 exports.uwpPickFile = uwpPickFile;

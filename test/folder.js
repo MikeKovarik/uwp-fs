@@ -22,3 +22,13 @@ describe('.readdir', () => {
 	it(`./fixtures/non-existing-file.txt`, async () => fs.readdir('./fixtures/non-existing-file.txt'))
 
 })
+
+
+describe('.mkdir', () => {
+
+	it(`existing file`, async () => fs.mkdir('fixtures/existing-file-1.txt'))
+	it(`existing folder`, async () => fs.mkdir('fixtures/existing-folder-1'))
+	it(`non existing file`, async () => fs.mkdir('fixtures/newly-created-file.txt'))
+	it(`non existing folder`, async () => fs.mkdir('fixtures/newly-created-foler'))
+
+})

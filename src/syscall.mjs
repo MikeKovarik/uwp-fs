@@ -36,7 +36,19 @@ export function reserveFd() {
 
 
 
-
+/*
+'r'   Open file for reading. An exception occurs if the file does not exist.
+'r+'  Open file for reading and writing. An exception occurs if the file does not exist.
+'rs+' Open file for reading and writing in synchronous mode. Instructs the operating system to bypass the local file system cache.
+'w'   Open file for writing. The file is created (if it does not exist) or truncated (if it exists).
+'wx'  Like 'w' but fails if path exists.
+'w+'  Open file for reading and writing. The file is created (if it does not exist) or truncated (if it exists).
+'wx+' Like 'w+' but fails if path exists.
+'a'   Open file for appending. The file is created if it does not exist.
+'ax'  Like 'a' but fails if path exists.
+'a+'  Open file for reading and appending. The file is created if it does not exist.
+'ax+' Like 'a+' but fails if path exists.
+*/
 export var open = callbackify(async (path, flags = 'r', mode = 0o666) => {
 	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
 	path = getPathFromURL(path)
@@ -46,19 +58,22 @@ export var open = callbackify(async (path, flags = 'r', mode = 0o666) => {
 	var storageObject = await openStorageObject(path, 'open')
 
 	var folder, file, stream, reader, writer
-	if (storageObject.constructor === StorageFolder) {
-		folder = storageObject
-	}
 
-	if (storageObject.constructor === StorageFile) {
+	if (storageObject.constructor === StorageFolder)
+		folder = storageObject
+	if (storageObject.constructor === StorageFile)
 		file = storageObject
+
+	if (file !== undefined) {
 		// Open file's read stream
 		// TODO: wrap in try/catch and handle errors
 		stream = await storageObject.openAsync(FileAccessMode.read)
 		if (!window.iStream)
 			window.iStream = stream
-		if (flags.includes('r'))
+		if (flags.includes('r')) {
 			var reader = new DataReader(stream)
+			reader.inputStreamOptions = InputStreamOptions.partial
+		}
 		if (flags === 'r+')
 			writer = 'TODO'
 		//FileAccessMode.read
@@ -69,6 +84,25 @@ export var open = callbackify(async (path, flags = 'r', mode = 0o666) => {
 	fds[fd] = {file, folder, storageObject, stream, reader, writer, path}
 	return fd
 })
+
+
+export var unlink = callbackify(async path => {
+})
+
+
+export var mkdir = callbackify(async path => {
+})
+
+
+// syscall used in: readdir
+export async function _scandir(path, fd) {
+	// Find empty fd number (slot for next descriptor we are about to open).
+	if (fd === undefined)
+		fd = findEmpyFd()
+	// Try to get folder descriptor for given path and store it to the empty slot.
+	fds[fd] = await openStorageFolder(path, 'scandir')
+	return fd
+}
 
 
 /*
@@ -143,6 +177,7 @@ export var close = callbackify(async fd => {
 		stream.close()
 })
 
+
 export var exists = callbackify(async path => {
 	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
 	path = getPathFromURL(path)
@@ -151,13 +186,13 @@ export var exists = callbackify(async path => {
 		await openStorageObject(path)
 		return true
 	} catch(err) {
-		console.log(err)
-		if (err.code === 'ENOENT')
-			return false
-		else
+		if (err.code !== 'ENOENT')
 			throw err
+		return false
 	}
 })
+
+
 
 export var stat = callbackify(async path => {
 	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
@@ -171,39 +206,6 @@ export var stat = callbackify(async path => {
 	await stats._ready
 	return stats
 })
-
-
-
-// syscall used in: readdir
-export async function _scandir(path, fd) {
-	// Find empty fd number (slot for next descriptor we are about to open).
-	if (fd === undefined)
-		fd = findEmpyFd()
-	// Try to get folder descriptor for given path and store it to the empty slot.
-	fds[fd] = await openStorageFolder(path, 'scandir')
-	return fd
-}
-
-/*
-// syscall used in: open
-export async function _open(path, fd) {
-	// Find empty fd number (slot for next descriptor we are about to open).
-	if (fd === undefined)
-		fd = reserveFd()
-	// Try to get file or folder descriptor for given path and store it to the empty slot.
-	fds[fd] = await openStorageObject(path, 'open')
-	return fd
-}
-
-export async function _read(fd) {
-	var storageObject = fds[fd]
-	if (storageObject.constructor === StorageFolder)
-		throw syscallException('EISDIR', 'read')
-	return fd
-}
-*/
-
-
 
 const DATE_ACCESSED = 'System.DateAccessed'
 

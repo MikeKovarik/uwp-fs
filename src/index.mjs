@@ -4,7 +4,6 @@ export * from './file.mjs'
 export * from './watch.mjs'
 export {uwpSetCwdFolder, cwd} from './path.mjs'
 
-export * from './conv/index.mjs' // TODO: spin into separate module
 export * from './uwp-apis.mjs'
 
 import {getPathFromURL} from './path.mjs'

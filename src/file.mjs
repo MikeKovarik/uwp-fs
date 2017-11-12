@@ -1,6 +1,5 @@
 import {Buffer, kMaxLength} from 'buffer'
 import {ReadStream, WriteStream} from './stream.mjs'
-//import {bufferFromIbuffer} from './conv/index.mjs' // TODO: spin into separate module
 import {isUwp, getOptions, nullCheck, callbackify} from './util.mjs'
 import {getPathFromURL} from './path.mjs'
 import {fds, open, close, read, _read} from './syscall.mjs'

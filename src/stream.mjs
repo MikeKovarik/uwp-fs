@@ -20,7 +20,6 @@ var defaultWriteStreamOptions = {
 }
 
 
-
 var pool
 
 function allocNewPool(poolSize) {
@@ -33,7 +32,7 @@ export class ReadStream extends Readable {
 	constructor(path, options = {}) {
 		options = Object.assign({}, defaultReadStreamOptions, options)
 		super(options)
-		handleError((this.path = getPathFromURL(path)))
+		this.path = getPathFromURL(path)
 		Object.assign(this, options)
 		this.pos = undefined
 		this.bytesRead = 0
@@ -150,7 +149,7 @@ export class WriteStream extends Writable {
 	constructor(path, options = {}) {
 		options = Object.assign({}, options)
 		super(options)
-		handleError((this.path = getPathFromURL(path)))
+		this.path = getPathFromURL(path)
 		Object.assign(this, options)
 		this.pos = undefined
 		this.bytesWritten = 0
@@ -178,6 +177,9 @@ export class WriteStream extends Writable {
 				this.destroy()
 		})
 	}
+
+	// TODO
+
 }
 
 
@@ -201,55 +203,3 @@ function closeFsStream(stream, cb, err) {
 		.catch(() => stream.emit('close'))
 		.catch(er => cb(er || err))
 }
-
-function handleError(val, callback) {
-  if (val instanceof Error) {
-    if (typeof callback === 'function') {
-      process.nextTick(callback, val);
-      return true;
-    } else throw val;
-  }
-  return false;
-}
-
-
-
-
-
-
-import {readableFromUwpStream} from './conv/index.mjs'
-
-export function createReadStream(path) {
-	var readable = new Readable
-	_createReadStream(readable, path)
-	return readable
-}
-export async function _createReadStream(readable, path) {
-	var fd = await _open(path, fd)
-	// Access UWP's File object
-	var file = fds[fd]
-	// Open file's read stream
-	var uwpStream = await file.openAsync(FileAccessMode.read)
-	// Transform UWP stream indo Node's Readable
-	readableFromUwpStream(uwpStream, {readable})
-}
-
-/*
-export function createReadStream(...args) {
-	console.log('createReadStream', ...args)
-	var readable = new Readable
-	_createReadStream(readable, args)
-	return readable
-}
-export async function _createReadStream(readable, args) {
-	var uwpFolder = getFolder(args)
-	var [filePath, options] = args
-	var [targetFolder, fileName] = await accessUwpFolder(uwpFolder, filePath)
-	// Access UWP's File object
-	var file = await targetFolder.getFileAsync(fileName)
-	// Open file's read stream
-	var uwpStream = await file.openAsync(FileAccessMode.read)
-	// Transform UWP stream indo Node's Readable
-	readableStreamFromUwpStream(uwpStream, {readable})
-}
-*/

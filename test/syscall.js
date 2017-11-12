@@ -259,6 +259,16 @@ describe('.exists', () => {
 })
 
 
+describe('.unlink', () => {
+
+	it(`file`, async () => fs.unlink('fixtures/to-be-deleted.zip'))
+	it(`folder`, async () => fs.unlink('folder-to-delete'))
+	it(`non existing file`, async () => fs.unlink('fixtures/not-existing-file.txt'))
+	it(`non existing folder`, async () => fs.unlink('fixtures/not-existing-foler'))
+
+})
+
+
 
 
 // WARNING: stats of files are almost impossible to comparatively match becaute they'll
