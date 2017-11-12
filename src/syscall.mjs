@@ -79,25 +79,29 @@ Read data from the file specified by 'fd'.
 'position' is an argument specifying where to begin reading from in the file. If position is null, data will be read from the current file position, and the file position will be updated. If position is an integer, the file position will remain unchanged.
 The callback is given the three arguments, '(err, bytesRead, buffer)'.
 */
-async function _read(fd, buffer, offset, length, position) {
-	//throw new errors.RangeError('Length extends beyond buffer')
-	if (position < 0)
+export async function _read(fd, buffer, offset, length, position) {
+	// NOTE: Order of these errors matter. Do not change.
+	if (buffer === undefined || !Buffer.isBuffer(buffer))
+		throw new errors.TypeError('Second argument needs to be a buffer')
+	// note: position -1 means don't move to any position, start reading where we left off last time.
+	if (position < -1)
 		throw syscallException('EINVAL', 'read')
 	if (offset < 0 || offset > buffer.length)
 		throw new errors.Error('Offset is out of bounds')
 	if (offset + length > buffer.length)
 		throw new errors.RangeError('Length extends beyond buffer')
-
-	var {stream, reader} = fds[fd]
+	var {file, folder, stream, reader} = fds[fd]
+	if (file === undefined && folder !== undefined)
+		throw syscallException('EISDIR', 'read')
+	if (position > stream.size)
+		return {bytesRead: 0, buffer}
 
 	// Set position where to begin reading from in the file.
-	if (position !== null)
+	if (position !== null && position !== -1)
 		stream.seek(position)
 	// Assess the ammount of bytes we want to read.
 	//var bytesToRead = length || stream.size
 	var bytesToRead = Math.min(stream.size - position, length)
-	console.log('should read', length)
-	console.log('will read', bytesToRead)
 	// Request to read that ammount of bytes, but but ready to comply to UWP's restictions.
     var bytesRead = await reader.loadAsync(bytesToRead)
 	//var bytesRead = reader.unconsumedBufferLength

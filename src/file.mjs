@@ -1,8 +1,9 @@
+import {Buffer, kMaxLength} from 'buffer'
 import {ReadStream, WriteStream} from './stream.mjs'
 //import {bufferFromIbuffer} from './conv/index.mjs' // TODO: spin into separate module
 import {isUwp, getOptions, nullCheck, callbackify} from './util.mjs'
 import {getPathFromURL} from './path.mjs'
-import {open, close, read} from './syscall.mjs'
+import {fds, open, close, read, _read} from './syscall.mjs'
 
 
 if (isUwp) {
@@ -12,18 +13,56 @@ if (isUwp) {
 }
 
 export var readFile = callbackify(async (path, options) => {
-	options = getOptions(options, {flag: 'r'})
-	//path = getPathFromURL(path)
-	//nullCheck(path)
-	var fd = await open(path)
-	//await read(fd)
-	//var storageFile = fds[fd]
-	//var iBuffer = await FileIO.readBufferAsync(storageFile)
-	//var result = bufferFromIbuffer(iBuffer)
-	var result = read(fd, 'TODO', 'TODO', 'TODO', 4)
-	// Close file descriptor
-	await close(fd)
-	return result
+
+	// NOTE: it's really 'flag' and not 'flags' like it's in fs.open
+	options = getOptions(options, {encoding: null, flag: 'r'})
+
+	var isUserFd = isFd(path)
+	var fd = isUserFd ? path : await open(path, options.flag)
+
+	// Access descriptor to avoid creating an fs.Stats instance for our internal use.
+	var {stream} = fds[fd]
+	// Get the size of the file (or folder).
+	var size = stream ? stream.size : 0
+	// Throw errors if the size is invalid.
+	//if (size === 0)
+	//	return Buffer.alloc(0)
+	if (size > kMaxLength) {
+		err = new RangeError('File size is greater than possible Buffer: ' + `0x${kMaxLength.toString(16)} bytes`)
+		close(fd)
+		throw err
+	}
+
+	try {
+		// Try to allocate enough memory for the size of the file.
+		var buffer = Buffer.allocUnsafe(size)
+		// Read (repeatedly if needed) the file into previously allocated buffer.
+		var offset = 0
+		// Do at least one iteration (even for folders) because read syscall can handle and  fire additional errors.
+		do {
+			let {bytesRead} = await _read(fd, buffer, offset, size, -1)
+			offset += bytesRead
+			// Break the loop in case we're unable to read anything.
+			if (bytesRead === 0)
+				break
+		} while (offset < size)
+	} catch (err) {
+		// All the errors received here should be already in the Node-like format and we can
+		// rethrow them after we safely close the file's fd.
+		close(fd)
+		throw err
+	}
+
+	// File sucessfully read. Close file descriptor and return filled buffer.
+	if (!isUserFd)
+		await close(fd)
+
+	// TODO: Investigate if some work needs to be done on our side (or if the buffer module handles it)
+	if (options.encoding !== null)
+		return buffer.toString(options.encoding)
+	else
+		return buffer
+
 })
 /*
 export async function readFile(path, encoding, callback) {
@@ -91,18 +130,16 @@ function isFd(path) {
 	return (path >>> 0) === path;
 }
 
-export async function writeFile(path, data, encoding, callback) {
+export async function writeFile(path, data, encoding) {
 	callback = maybeCallback(callback || options)
 	options = getOptions(options, {encoding: 'utf8', mode: 0o666, flag: 'w'})
 
-	if (isFd(path)) {
-		writeFd(path, true)
-		return
-	}
+	if (isFd(path))
+		var fd = path
+	else
+		var fd = await fs.open(path, options.flag, options.mode)
 
-	fs.open(path, options.flag, options.mode)
-		.then(fd => writeFd(fd, false))
-		.catch(openErr => callback(openErr))
+	await writeFd(fd, true)
 
 	function writeFd(fd, isUserFd) {
 	}

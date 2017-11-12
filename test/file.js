@@ -4,6 +4,7 @@ if (typeof require === 'function') {
 	var fs = {
 		readFile: promisify(originalFs.readFile),
 		writeFile: promisify(originalFs.writeFile),
+		open: promisify(originalFs.open),
 	}
 	var cwd = process.cwd()
 } else {
@@ -15,14 +16,24 @@ if (typeof require === 'function') {
 
 describe('.readFile', () => {
 
-	it(`./fixtures/ow-quotes.txt`, async () => fs.readFile('./fixtures/ow-quotes.txt'))
-/*
-	it(`./fixtures/ow-quotes`, async () => fs.readFile('./fixtures/ow-quotes'))
-	it(`./fixtures/non-existing-file.txt`, async () => fs.readFile('./fixtures/non-existing-file.txt'))
-	it(`./`, async () => fs.readFile('./'))
-	it(`./fixtures/empty-folder`, async () => fs.readFile('./fixtures/empty-folder'))
-	it(`./fixtures/non-existing`, async () => fs.readFile('./fixtures/non-existing'))
-	it(`./fixtures/yet/another/subfolder`, async () => fs.readFile('./fixtures/yet/another/subfolder'))
+	function itReadsFile(path) {
+		it(path, async () => fs.readFile(path))
+	}
+
+	// file
+	itReadsFile(`./fixtures/ow-quotes.txt`)
+	itReadsFile(`./fixtures/Empty.dat`)
+	itReadsFile(`./fixtures/EXTENSIONLESS`)
+	// folders
+	itReadsFile(`./`)
+	itReadsFile(`./fixtures/`)
+	itReadsFile(`./fixtures/empty-folder`)
+	itReadsFile(`./fixtures/yet/another/subfolder`)
+	// incorrect partial path or missing files/folders
+	itReadsFile(`./fixtures/ow-quotes`)
+	itReadsFile(`./fixtures/non-existing-file.txt`)
+	itReadsFile(`./fixtures/non-existing`)
+	itReadsFile(`./fixtures/non-existing-folder/non-existing-file.txt`)
 
 	it(`fd before and after reading file`, async () => {
 		var firstFd = await fs.open('.', 'r')
@@ -30,8 +41,19 @@ describe('.readFile', () => {
 		var secondFd = await fs.open('.', 'r')
 		return [firstFd, secondFd]
 	})
-*/
+
+	// Encodings rely on buffer module
+	it('encoding: ascii', async () => fs.readFile(`./fixtures/ow-quotes.txt`, 'ascii'))
+	it('encoding: utf8', async () => fs.readFile(`./fixtures/ow-quotes.txt`, 'utf8'))
+	it('encoding: utf16le', async () => fs.readFile(`./fixtures/ow-quotes.txt`, 'utf16le'))
+	it('encoding: ucs2', async () => fs.readFile(`./fixtures/ow-quotes.txt`, 'ucs2'))
+	it('encoding: base64', async () => fs.readFile(`./fixtures/ow-quotes.txt`, 'base64'))
+	it('encoding: latin1', async () => fs.readFile(`./fixtures/ow-quotes.txt`, 'latin1'))
+	it('encoding: binary', async () => fs.readFile(`./fixtures/ow-quotes.txt`, 'binary'))
+	it('encoding: hex', async () => fs.readFile(`./fixtures/ow-quotes.txt`, 'hex'))
+
 })
+
 /*
 describe('.writeFile', () => {
 
@@ -43,31 +65,8 @@ describe('.writeFile', () => {
 })
 */
 
+
 /*
-describe('readFile()', () => {
-
-	it(`.readFile() existing relative filepath`, async function() {
-		return fs.readFile('.\\fixtures\\ow-quotes.txt')
-	})
-	it(`.readFile() existing semi-absolute filepath`, async function() {
-		return fs.readFile('\\fixtures\\ow-quotes.txt')
-	})
-	it(`.readFile() existing absolute filepath`, async function() {
-		return fs.readFile(cwd + '\\fixtures\\ow-quotes.txt')
-	})
-	it(`.readFile() non-existing relative filepath`, async function() {
-		return fs.readFile('.\\fixtures\\not-existing-file.txt')
-	})
-	it(`.readFile() non-existing semi-absolute filepath`, async function() {
-		return fs.readFile('\\fixtures\\not-existing-file.txt')
-	})
-	it(`.readFile() non-existing absolute filepath`, async function() {
-		return fs.readFile(cwd + '\\fixtures\\not-existing-file.txt')
-	})
-	
-})
-
-
 describe('writeFile()', () => {
 
 	it(`.writeFile() non-existing absolute filepath`, async function() {

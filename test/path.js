@@ -14,14 +14,18 @@ describe('path resolution', () => {
 	function itResolves(...args) {
 		if (args.length === 3) {
 			var name = args.shift()
-			var [tested, actual] = args
+			var [initial, desired] = args
 		} else {
-			var [tested, actual] = args
-			console.log('tested', tested)
-			console.log('actual', actual)
-			var name = `${tested} === ${actual}`
+			var [initial, desired] = args
+			var name = `${initial} === ${desired}`
 		}
-		it(name, () => assert.equal(getPathFromURL(tested), actual))
+		it(name, () => {
+			var actual = getPathFromURL(initial)
+			console.log('initial', initial)
+			console.log('desired', desired)
+			console.log('actual ', actual)
+			assert.equal(actual, desired)
+		})
 	}
 
 	itResolves('cwd === cwd', cwd, cwd)

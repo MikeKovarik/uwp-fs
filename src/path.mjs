@@ -50,7 +50,11 @@ export function getPathFromURL(path) {
 	else if (!path.includes(':\\'))
 		path = cwd + '\\' + path
 	// Normalize the path
-	return normalizeArray(path.split(/\\+/g)).join('\\')
+	var normalized = normalizeArray(path.split(/\\+/g)).join('\\')
+	if (normalized.endsWith(':'))
+		return normalized + '\\'
+	else
+		return normalized
 }
 
 function normalizeArray(parts) {
