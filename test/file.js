@@ -1,17 +1,9 @@
-if (typeof require === 'function') {
-	var originalFs = require('fs')
-	var promisify = require('util').promisify
-	var fs = {
-		readFile: promisify(originalFs.readFile),
-		writeFile: promisify(originalFs.writeFile),
-		open: promisify(originalFs.open),
-	}
-	var cwd = process.cwd()
-} else {
-	var fs = window['uwp-fs']
-	var cwd = fs.cwd
+if (typeof require === 'function')
+	var testUtils = require('./testUtils.js')
+else
 	mouka.setup('cdd')
-}
+
+var {fs, exists, ensureFolder, ensureFile, ensureDeleted} = testUtils
 
 
 describe('.readFile', () => {

@@ -1,13 +1,13 @@
-export {open, close, read, stat, exists} from './syscall.mjs'
+export {open, close, read, stat, unlink, rmdir, mkdir, exists} from './syscall.mjs'
 export * from './folder.mjs'
 export * from './file.mjs'
 export * from './watch.mjs'
-export {uwpSetCwdFolder, cwd} from './path.mjs'
+export {uwpSetCwdFolder, uwpSetCwd, cwd, cwdFolder} from './path.mjs'
 
 export * from './uwp-apis.mjs'
 
-import {getPathFromURL} from './path.mjs'
-export var _internals = {getPathFromURL}
+import {getPathFromURL, installFolder, dataFolder} from './path.mjs'
+export var _internals = {getPathFromURL, installFolder, dataFolder}
 
 
 // TODO

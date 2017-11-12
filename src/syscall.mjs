@@ -87,10 +87,28 @@ export var open = callbackify(async (path, flags = 'r', mode = 0o666) => {
 
 
 export var unlink = callbackify(async path => {
+	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
+	path = getPathFromURL(path)
+	nullCheck(path)
+	// Access UWP's StorageFile object
+	// Note: Not wrapped in try/catching because openStorageObject() returns sanitized Node-like error object.
+	var storageObject = await openStorageFile(path, 'stat')
 })
 
 
 export var mkdir = callbackify(async path => {
+	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
+	path = getPathFromURL(path)
+	nullCheck(path)
+})
+
+export var rmdir = callbackify(async path => {
+	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
+	path = getPathFromURL(path)
+	nullCheck(path)
+	// Access UWP's StorageFolder object
+	// Note: Not wrapped in try/catching because openStorageObject() returns sanitized Node-like error object.
+	var storageObject = await openStorageFolder(path, 'rmdir')
 })
 
 
@@ -198,7 +216,7 @@ export var stat = callbackify(async path => {
 	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
 	path = getPathFromURL(path)
 	nullCheck(path)
-	// Access UWP's File object
+	// Access UWP's storage object
 	// Note: Not wrapped in try/catching because openStorageObject() returns sanitized Node-like error object.
 	var storageObject = await openStorageObject(path, 'stat')
 	// Create Stats instance, wait for the hidden ready promise (UWP apis are async) and return it

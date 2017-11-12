@@ -3,18 +3,22 @@ import {isUwp, readyPromises} from './util.mjs'
 
 export var cwd
 
+export var installFolder
+export var dataFolder
+export var cwdFolder
+
 if (isUwp) {
 	
 	// Path to local installation of the app.
 	// App's source code (what the project includes) is there
 	// If sideloaded it's in \bin\Debug\AppX of the folder where the Visual Studio project is.
 	// Windows.ApplicationModel.Package.current.installedLocation
-	var installFolder = Windows.ApplicationModel.Package.current.installedLocation
+	installFolder = Windows.ApplicationModel.Package.current.installedLocation
 
 	// Path to %AppData%\Local\Packages\{id}\LocalState
 	// It's empty and app's data can be stored there
 	// Windows.Storage.ApplicationData.current.localFolder
-	var dataFolder = Windows.Storage.ApplicationData.current.localFolder
+	dataFolder = Windows.Storage.ApplicationData.current.localFolder
 
 
 	let subPath = location
@@ -26,15 +30,20 @@ if (isUwp) {
 
 	cwd = installFolder.path + '\\' + subPath
 
-	var cwdFolder
 	var promise = installFolder.getFolderAsync(subPath)
 		.then(folder => cwdFolder = folder)
 	readyPromises.push(promise) 
 
 }
 
+export async function uwpSetCwd(newCwd) {
+	cwd = newCwd
+	var path = getPathFromURL(cwd)
+	cwdFolder = await Windows.Storage.StorageFolder.getFolderFromPathAsync(path)
+}
 export function uwpSetCwdFolder(newFolder) {
 	cwdFolder = newFolder
+	cwd = cwdFolder.path
 }
 
 
@@ -71,4 +80,8 @@ function normalizeArray(parts) {
 		}
 	}
 	return res
+}
+
+export function relativize(path) {
+	return path.slice(cwd.length + 1)
 }
