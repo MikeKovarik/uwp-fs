@@ -1,32 +1,20 @@
-import {fds, open, close, _scandir, reserveFd} from './syscall.mjs'
+import {isUwp, callbackify, nullCheck} from './util.mjs'
+import {fds, open, close, reserveFd} from './syscall.mjs'
+import {openStorageFolder} from './uwp-storageobject.mjs'
 
 
-export async function readdir(path, callback) {
-	var fd = reserveFd()
-	try {
-		await _scandir(path, fd)
-		var storageFolder = fds[fd]
-		var result = (await storageFolder.getItemsAsync())
-			.map(getNames)
-			.sort()
-		// Close file descriptor
-		await close(fd)
-		if (callback) callback(null, result)
-		return result
-	} catch(err) {
-		// Ensure we're leaving no descriptor open
-		await close(fd)
-		if (callback) callback(err)
-		throw err
-	}
-}
+export var readdir = callbackify(async path => {
+	// Access StorageFolder directly, because readdir doesn't use .open() and FDs
+	var folder = await openStorageFolder(path, 'scandir')
+	return (await folder.getItemsAsync())
+		.map(file => file.name)
+		.sort(caseInsensitiveSort)
+})
 
-async function getList(storageFolder) {
-	return (await storageFolder.getItemsAsync())
-		.map(getNames)
-		.sort()
-}
-
-function getNames(storageFile) {
-	return storageFile.name
+function caseInsensitiveSort(a, b) {
+	a = a.toLowerCase()
+	b = b.toLowerCase()
+	if (a == b) return 0
+	if (a > b) return 1
+	return -1
 }

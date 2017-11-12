@@ -1,19 +1,9 @@
-if (typeof require === 'function') {
-	var originalFs = require('fs')
-	var promisify = require('util').promisify
-	var fs = {
-		open: promisify(originalFs.open),
-		close: promisify(originalFs.close),
-		read: promisify(originalFs.read),
-		exists: promisify(originalFs.exists),
-		stat: promisify(originalFs.stat),
-	}
-	var cwd = process.cwd()
-} else {
-	var fs = window['uwp-fs']
-	var cwd = fs.cwd
+if (typeof require === 'function')
+	var testUtils = require('./testUtils.js')
+else
 	mouka.setup('cdd')
-}
+
+var {fs, exists, ensureFolder, ensureFile, ensureDeleted} = testUtils
 
 
 describe('fd', () => {
@@ -143,14 +133,6 @@ describe('.read', () => {
 			return buffer
 		})
 
-		// todo: offset negative
-		// todo: offset 0
-		// todo: offset in middle
-		// todo: offset beyond
-		// todo: position negative
-		// todo: position 0
-		// todo: position in middle
-		// todo: position beyond
 
 		// buffer size 15, read 9 characters at offset 13
 		it(`offset overflowing end of buffer`, async () => {
@@ -213,7 +195,7 @@ describe('.read', () => {
 
 		function itReads(path) {
 			it(path, async () => {
-				var fd = await fs.open(path, 'r')
+				fd = await fs.open(path, 'r')
 				var buffer = Buffer.alloc(3)
 				return fs.read(fd, buffer, 0, 3, 0)
 			})
@@ -236,8 +218,11 @@ describe('.read', () => {
 
 	describe(`edge cases`, () => {
 
+		var fd
+		afterEach(async () => await fs.close(fd))
+
 		it(`empty file`, async () => {
-			var fd = await fs.open('fixtures/Empty.dat', 'r')
+			fd = await fs.open('fixtures/Empty.dat', 'r')
 			var buffer = Buffer.alloc(0)
 			return fs.read(fd, buffer, 0, 0, 0)
 		})
@@ -249,6 +234,7 @@ describe('.read', () => {
 })
 
 
+
 describe('.exists', () => {
 
 	it(`file`, async () => fs.exists('fixtures/ow-quotes.txt'))
@@ -258,6 +244,7 @@ describe('.exists', () => {
 
 })
 
+/*
 
 describe('.unlink', () => {
 
@@ -267,7 +254,7 @@ describe('.unlink', () => {
 	it(`non existing folder`, async () => fs.unlink('fixtures/not-existing-foler'))
 
 })
-
+*/
 
 
 
@@ -316,26 +303,7 @@ describe('.stat', () => {
 
 
 describe('complex example', () => {
-/*
-	it(`1`, async () => {
-		fs.exists(fileName, function(exists) {
-			if (exists) {
-				// get information about the file
-				fs.stat(fileName, function(error, stats) {
-					// open the file (getting a file descriptor to it)
-					fs.open(fileName, "r", function(error, fd) {
-						var buffer = new Buffer(stats.size)
-						// read its contents into buffer
-						fs.read(fd, buffer, 0, buffer.length, null, function(error, bytesRead, buffer) {
-							var data = buffer.toString("utf8", 0, buffer.length)
-							fs.close(fd)
-						})
-					})
-				})
-			}
-		})
-	})
-*/
+
 	it(`1`, async () => {
 		var path = 'fixtures/ow-quotes.txt'
 		var exists = await fs.exists(path)

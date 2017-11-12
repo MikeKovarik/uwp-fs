@@ -82,6 +82,12 @@ function normalizeArray(parts) {
 	return res
 }
 
-export function relativize(path) {
-	return path.slice(cwd.length + 1)
+export function relativize(path, relativeTo = cwd) {
+	return path.slice(relativeTo.length + 1)
+}
+
+export function dirname(path) {
+	var sections = path.split('\\')
+	sections.pop()
+	return sections.join('\\')
 }

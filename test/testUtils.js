@@ -19,7 +19,13 @@ if (isNode) {
 		readdir: promisify(originalFs.readdir),
 		mkdir: promisify(originalFs.mkdir),
 		rmdir: promisify(originalFs.rmdir),
+		exists: promisify(originalFs.exists),
 		stat: promisify(originalFs.stat),
+		readFile: promisify(originalFs.readFile),
+		writeFile: promisify(originalFs.writeFile),
+		rename: promisify(originalFs.rename),
+		unlink: promisify(originalFs.unlink),
+		watch: originalFs.watch,
 		cwd: process.cwd()
 	}
 } else {
@@ -97,21 +103,29 @@ async function ensureFolder(path) {
 async function ensureDeleted(path) {
 	if (await exists(path) === false) return
 	if (isNode) {
-		try {
-			await fs.unlink(path)
-		} catch(err) {
-			await fs.rmdir(path)
-		}
+		return deleteRecursive(path)
 	} else {
 		path = getPathFromURL(path)
 		var relative = path.slice(fs.cwd.length + 1)
 		try {
-			var folder = await fs.cwdFolder.getFileAsync(relative)
-			await folder.deleteAsync()
-		} catch(err) {
-			var file = await fs.cwdFolder.getFolderAsync(relative)
+			var file = await fs.cwdFolder.getFileAsync(relative)
 			await file.deleteAsync()
+		} catch(err) {
+			var folder = await fs.cwdFolder.getFolderAsync(relative)
+			await folder.deleteAsync()
 		}
+	}
+}
+
+async function deleteRecursive(path) {
+	var stat = await fs.stat(path)
+	if (stat.isDirectory()) {
+		var promises = (await fs.readdir(path))
+			.map(name => deleteRecursive(`${path}/${name}`))
+		await Promise.all(promises)
+		await fs.rmdir(path)
+	} else {
+		return fs.unlink(path)
 	}
 }
 

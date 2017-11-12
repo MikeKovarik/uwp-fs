@@ -46,6 +46,16 @@ export var ERROR = {
 		errno: -4068, // 28
 		code: 'EISDIR',
 		description: 'illegal operation on a directory'
+	},
+	EEXIST: {
+		errno: -4075, // 47
+		code: 'EEXIST',
+		description: 'file already exists'
+	},
+	ENOTEMPTY: {
+		errno: -4051, // 53
+		code: 'ENOTEMPTY',
+		description: 'directory not empty'
 	}
 }
 

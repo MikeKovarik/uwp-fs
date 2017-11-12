@@ -29,8 +29,12 @@ describe('.readFile', () => {
 
 	it(`fd before and after reading file`, async () => {
 		var firstFd = await fs.open('.', 'r')
-		fs.readFile('./fixtures/ow-quotes.txt')
+		var promise = fs.readFile('./fixtures/ow-quotes.txt')
 		var secondFd = await fs.open('.', 'r')
+		fs.close(firstFd)
+		fs.close(secondFd)
+		// wait for the file to be closed (and its fd released)
+		await promise
 		return [firstFd, secondFd]
 	})
 
@@ -53,13 +57,6 @@ describe('.writeFile', () => {
 	it(`./fixtures/empty-folder`, async () => fs.writeFile('./fixtures/empty-folder', data))
 	it(`./fixtures/non-existing/new-file.txt`, async () => fs.writeFile('./fixtures/non-existing/new-file.txt', data))
 	it(`./fixtures/new-file.txt`, async () => fs.writeFile('./fixtures/new-file.txt', data))
-
-})
-*/
-
-
-/*
-describe('writeFile()', () => {
 
 	it(`.writeFile() non-existing absolute filepath`, async function() {
 		return fs.writeFile('.\\non-existing-folder\\file.txt', 'data')
