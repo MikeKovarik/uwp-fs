@@ -80,6 +80,11 @@
     <Content Include="test\file.js" />
     <Content Include="test\file.json" />
     <Content Include="test\fixtures\Empty.dat" />
+    <Content Include="test\fixtures\existing-file-1.txt" />
+    <Content Include="test\fixtures\existing-file-2.txt" />
+    <Content Include="test\fixtures\existing-file-3.txt" />
+    <Content Include="test\fixtures\existing-file-4.txt" />
+    <Content Include="test\fixtures\existing-file-5.txt" />
     <Content Include="test\fixtures\EXTENSIONLESS" />
     <Content Include="test\fixtures\folder-to-delete\some file.txt" />
     <Content Include="test\fixtures\ow-quotes.txt" />
@@ -104,7 +109,12 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="test\fixtures\empty-folder\" />
-    <Folder Include="test\fixtures\New folder\" />
+    <Folder Include="test\fixtures\existing-folder-1\" />
+    <Folder Include="test\fixtures\existing-folder-2\" />
+    <Folder Include="test\fixtures\existing-folder-3\" />
+    <Folder Include="test\fixtures\existing-folder-4\" />
+    <Folder Include="test\fixtures\existing-folder-5\" />
+    <Folder Include="test\fixtures\folder-to-delete\subfolder\" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\$(WMSJSProjectDirectory)\Microsoft.VisualStudio.$(WMSJSProject).targets" />
   <!-- To modify your build process, add your task inside one of the targets below then uncomment

@@ -358,7 +358,7 @@ function processError(err, syscall, path, storageObjectType) {
 
 if (isUwp) {
 	var {StorageFolder, StorageFile, FileAccessMode} = Windows.Storage;
-	var {DataReader} = Windows.Storage.Streams;
+	var {DataReader, DataWriter, InputStreamOptions} = Windows.Storage.Streams;
 }
 
 // List of active File Descriptors.
@@ -854,7 +854,7 @@ function closeFsStream(stream$$1, cb, err) {
 
 if (isUwp) {
 	var {FileIO} = Windows.Storage;
-	var {DataReader: DataReader$1, DataWriter} = Windows.Storage.Streams;
+	var {DataReader: DataReader$1, DataWriter: DataWriter$1} = Windows.Storage.Streams;
 	var COLLISION = Windows.Storage.CreationCollisionOption;
 }
 

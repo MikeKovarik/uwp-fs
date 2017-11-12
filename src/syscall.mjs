@@ -6,7 +6,7 @@ import {getPathFromURL} from './path.mjs'
 
 if (isUwp) {
 	var {StorageFolder, StorageFile, FileAccessMode} = Windows.Storage
-	var {DataReader} = Windows.Storage.Streams
+	var {DataReader, DataWriter, InputStreamOptions} = Windows.Storage.Streams
 }
 
 // List of active File Descriptors.

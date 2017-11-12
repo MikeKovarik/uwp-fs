@@ -59,3 +59,4 @@ experiments
 bin
 bld
 .vs
+test/*.json
