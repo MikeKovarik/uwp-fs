@@ -1,58 +1,48 @@
 var fs = window['uwp-fs']
 
-var appPath = Windows.Storage.ApplicationData.current.localFolder.path
+var $installedLocation = document.querySelector('#installedLocation')
+var $localFolder = document.querySelector('#localFolder')
+var $requestAccess = document.querySelector('#request-access')
+var $readFilePath = document.querySelector('#readFile-path')
+var $readFile = document.querySelector('#readFile')
+var $readdirPath = document.querySelector('#readdir-path')
+var $readdir = document.querySelector('#readdir')
+var $log = document.querySelector('#log')
 
-var link = document.createElement('a')
-link.href = appPath
+var installedLocation = Windows.ApplicationModel.Package.current.installedLocation.path
+$installedLocation.textContent = installedLocation
+$localFolder.textContent = Windows.Storage.ApplicationData.current.localFolder.path
 
-document.body.appendChild(link)
+$readFilePath.value = installedLocation + '\\index.js'
+$readdirPath.value = 'C:\\Windows'
 
-link.addEventListener('click', e => {
-	Windows.System.Launcher.launchFolderAsync()
+$requestAccess.addEventListener('click', async e => {
+	var folder = await fs.uwpPickAndCacheDrive()
 })
 
-var {Pickers} = Windows.Storage
-
-
-
-document.querySelector('#request-folder')
-	.addEventListener('click', async e => {
-		var folder = await fs.uwpPickAndCacheDrive()
+$readFile.addEventListener('click', async e => {
+	var path = $readFilePath.value || ''
+	fs.readFile(path)
+		.then(buffer => logToDom(buffer.toString()))
+		.catch(logToDom)
+})
+$readdir.addEventListener('click', async e => {
+	var path = $readdirPath.value || ''
+	fs.readdir(path, (err, array) => {
+		if (err)
+			logToDom(err)
+		else
+			logToDom(array)
 	})
+})
 
-
-//fs.ready.then(main)
-setTimeout(main, 1100)
-
-async function main() {
-/*
-	fs.uwpTraverseStorage('C:\\Users\\kenrm\\OneDrive\\Dev\\uwp-fs')
-		//.then(data => console.log('then', data))
-		.catch(err => console.log('catch', err))
-
-	fs.uwpTraverseStorage('C:\\Users\\kenrm\\OneDrive\\Dev\\uwp-fs\\LICENSE')
-		//.then(data => console.log('then', data))
-		.catch(err => console.log('catch', err))
-
-	fs.uwpTraverseStorage('C:\\Users\\kenrm\\OneDrive\\Dev\\uwp-fs\\.gitignore')
-		//.then(data => console.log('then', data))
-		.catch(err => console.log('catch', err))
-
-	fs.uwpTraverseStorage('C:\\Users\\kenrm\\OneDrive\\Dev\\uwp-fs\\index.mjs')
-		//.then(data => console.log('then', data))
-		.catch(err => console.log('catch', err))
-*/
-
-	fs.uwpExperiment('C:\\Users\\kenrm\\OneDrive\\Dev\\uwp-fs')
-		.then(data => console.log('then', data))
-		.catch(err => console.log('catch', err))
-
-	fs.uwpExperiment('C:\\Users\\kenrm\\OneDrive\\Dev\\uwp-fs\\LICENSE')
-		.then(data => console.log('then', data))
-		.catch(err => console.log('catch', err))
-
-	fs.uwpExperiment('C:\\Users\\kenrm\\OneDrive\\Dev\\uwp-fs\\index.mjs')
-		.then(data => console.log('then', data))
-		.catch(err => console.log('catch', err))
-
+function logToDom(arg) {
+	var string
+	try {
+		string = JSON.stringify(arg, null, 2)
+	} catch(err) {
+		string = arg.toString()
+	}
+	$log.textContent = string
 }
+

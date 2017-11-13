@@ -144,6 +144,21 @@ var ERROR = {
 		errno: -4068, // 28
 		code: 'EISDIR',
 		description: 'illegal operation on a directory'
+	},
+	EEXIST: {
+		errno: -4075, // 47
+		code: 'EEXIST',
+		description: 'file already exists'
+	},
+	EPERM:  {
+		errno: -4048, // 50
+		code: 'EPERM',
+		description: 'operation not permitted'
+	},
+	ENOTEMPTY: {
+		errno: -4051, // 53
+		code: 'ENOTEMPTY',
+		description: 'directory not empty'
 	}
 };
 
@@ -190,18 +205,22 @@ function makeNodeError(Err) {
 
 ;
 
+var installFolder;
+var dataFolder;
+;
+
 if (isUwp) {
 	
 	// Path to local installation of the app.
 	// App's source code (what the project includes) is there
 	// If sideloaded it's in \bin\Debug\AppX of the folder where the Visual Studio project is.
 	// Windows.ApplicationModel.Package.current.installedLocation
-	var installFolder = Windows.ApplicationModel.Package.current.installedLocation;
+	installFolder = Windows.ApplicationModel.Package.current.installedLocation;
 
 	// Path to %AppData%\Local\Packages\{id}\LocalState
 	// It's empty and app's data can be stored there
 	// Windows.Storage.ApplicationData.current.localFolder
-	var dataFolder = Windows.Storage.ApplicationData.current.localFolder;
+	dataFolder = Windows.Storage.ApplicationData.current.localFolder;
 
 
 	let subPath = location
@@ -213,15 +232,20 @@ if (isUwp) {
 
 	exports.cwd = installFolder.path + '\\' + subPath;
 
-	var cwdFolder;
 	var promise = installFolder.getFolderAsync(subPath)
-		.then(folder => cwdFolder = folder);
+		.then(folder => exports.cwdFolder = folder);
 	readyPromises.push(promise); 
 
 }
 
+async function uwpSetCwd(newCwd) {
+	exports.cwd = newCwd;
+	var path = getPathFromURL(exports.cwd);
+	exports.cwdFolder = await Windows.Storage.StorageFolder.getFolderFromPathAsync(path);
+}
 function uwpSetCwdFolder(newFolder) {
-	cwdFolder = newFolder;
+	exports.cwdFolder = newFolder;
+	exports.cwd = exports.cwdFolder.path;
 }
 
 
@@ -258,6 +282,16 @@ function normalizeArray(parts) {
 		}
 	}
 	return res
+}
+
+function relativize(path, relativeTo = exports.cwd) {
+	return path.slice(relativeTo.length + 1)
+}
+
+function dirname(path) {
+	var sections = path.split('\\');
+	sections.pop();
+	return sections.join('\\')
 }
 
 if (isUwp) {
@@ -401,10 +435,7 @@ function reserveFd() {
 'a+'  Open file for reading and appending. The file is created if it does not exist.
 'ax+' Like 'a+' but fails if path exists.
 */
-var open = callbackify(async (path, flags = 'r', mode = 0o666) => {
-	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
-	path = getPathFromURL(path);
-	nullCheck(path);
+async function _open(fd, path, flags = 'r', mode = 0o666) {
 	// Access UWP's File object
 	// Note: Not wrapped in try/catching because openStorageObject() returns sanitized Node-like error object.
 	var storageObject = await openStorageObject(path, 'open');
@@ -432,29 +463,122 @@ var open = callbackify(async (path, flags = 'r', mode = 0o666) => {
 		//FileAccessMode.readWrite
 	}
 
+	return {file, folder, storageObject, stream: stream$$1, reader, writer, path}
+}
+var open = callbackify(async (path, flags, mode) => {
+	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
+	path = getPathFromURL(path);
+	nullCheck(path);
+	// we need to reserve fd ahead of async operations to prevent collisions
 	var fd = reserveFd();
-	fds[fd] = {file, folder, storageObject, stream: stream$$1, reader, writer, path};
+	// Try to do the actual opening
+	try {
+		// Store all storage objects if opening succeeded (file or folder at given path exists)
+		fds[fd] = await _open(fd, path, flags, mode);
+	} catch(err) {
+		// Otherwise close the fd and propragate captured error.
+		clearFd(fd);
+		throw err
+	}
+	// Open returns fd number we can alter use to access the storage objects
 	return fd
 });
 
+/*
+export var open = callbackify(async (path, flags = 'r', mode = 0o666) => {
+	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
+	path = getPathFromURL(path)
+	nullCheck(path)
+	// we need to reserve fd ahead of async operations to prevent collisions
+	var fd = reserveFd()
+	// Access UWP's File object
+	// Note: Not wrapped in try/catching because openStorageObject() returns sanitized Node-like error object.
+	var storageObject = await openStorageObject(path, 'open')
 
+	var folder, file, stream, reader, writer
+
+	if (storageObject.constructor === StorageFolder)
+		folder = storageObject
+	if (storageObject.constructor === StorageFile)
+		file = storageObject
+
+	if (file !== undefined) {
+		// Open file's read stream
+		// TODO: wrap in try/catch and handle errors
+		stream = await storageObject.openAsync(FileAccessMode.read)
+		if (!window.iStream)
+			window.iStream = stream
+		if (flags.includes('r')) {
+			var reader = new DataReader(stream)
+			reader.inputStreamOptions = InputStreamOptions.partial
+		}
+		if (flags === 'r+')
+			writer = 'TODO'
+		//FileAccessMode.read
+		//FileAccessMode.readWrite
+	}
+
+	fds[fd] = {file, folder, storageObject, stream, reader, writer, path}
+	return fd
+})
+
+*/
 var unlink = callbackify(async path => {
+	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
+	path = getPathFromURL(path);
+	nullCheck(path);
+	// Access UWP's StorageFile object
+	// Note: Not wrapped in try/catching because openStorageObject() returns sanitized Node-like error object.
+	var storageObject = await openStorageObject(path, 'unlink');
+	if (storageObject.constructor === StorageFolder)
+		throw syscallException('EPERM', 'unlink', path)
+	await storageObject.deleteAsync();
 });
 
 
 var mkdir = callbackify(async path => {
+	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
+	path = getPathFromURL(path);
+	nullCheck(path);
+	// Get path to parent folder.
+	var parentPath = dirname(path);
+	// NOTE: Can't use open() or openStorageFolder() because mkdir throws slightly different errors.
+	try {
+		var parentFolder = await StorageFolder.getFolderFromPathAsync(parentPath);
+	} catch(err) {
+		// NOTE: we really need to return whole 'path' despite asking for 'parentpath' 
+		throw syscallException('ENOENT', 'mkdir', path)
+	}
+	// Try to get object on given path and throw error if something exists.
+	try {
+		var storageObject = await openStorageObject(path, 'mkdir');
+	} catch(err) {}
+	if (storageObject)
+		throw syscallException('EEXIST', 'mkdir', path)
+	// All clear, we can proceed to create the folder.
+	var foldername = relativize(path, parentPath);
+	await parentFolder.createFolderAsync(foldername);
 });
 
 
-// syscall used in: readdir
-async function _scandir(path, fd) {
-	// Find empty fd number (slot for next descriptor we are about to open).
-	if (fd === undefined)
-		fd = findEmpyFd();
-	// Try to get folder descriptor for given path and store it to the empty slot.
-	fds[fd] = await openStorageFolder(path, 'scandir');
-	return fd
-}
+var rmdir = callbackify(async path => {
+	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
+	path = getPathFromURL(path);
+	nullCheck(path);
+	// Access UWP's StorageFolder object
+	// Note: Not wrapped in try/catching because openStorageObject() returns sanitized Node-like error object.
+	var storageObject = await openStorageObject(path, 'rmdir');
+	// Throw errors if there's file a file of the same name, or if the folder has content-
+	if (storageObject.constructor === StorageFile)
+		throw syscallException('ENOENT', 'rmdir', path)
+	var children = await storageObject.getItemsAsync();
+	if (children.length > 0)
+		throw syscallException('ENOTEMPTY', 'rmdir', path)
+	// No errors, the folder is empty, delete it.
+	await storageObject.deleteAsync();
+});
+
+
 
 
 /*
@@ -550,7 +674,7 @@ var stat = callbackify(async path => {
 	// Create absolute path and check for corrections (it thows proper Node-like error otherwise)
 	path = getPathFromURL(path);
 	nullCheck(path);
-	// Access UWP's File object
+	// Access UWP's storage object
 	// Note: Not wrapped in try/catching because openStorageObject() returns sanitized Node-like error object.
 	var storageObject = await openStorageObject(path, 'stat');
 	// Create Stats instance, wait for the hidden ready promise (UWP apis are async) and return it
@@ -622,34 +746,20 @@ class Stats {
 
 }
 
-async function readdir(path, callback) {
-	var fd = reserveFd();
-	try {
-		await _scandir(path, fd);
-		var storageFolder = fds[fd];
-		var result = (await storageFolder.getItemsAsync())
-			.map(getNames)
-			.sort();
-		// Close file descriptor
-		await close(fd);
-		if (callback) callback(null, result);
-		return result
-	} catch(err) {
-		// Ensure we're leaving no descriptor open
-		await close(fd);
-		if (callback) callback(err);
-		throw err
-	}
-}
+var readdir = callbackify(async path => {
+	// Access StorageFolder directly, because readdir doesn't use .open() and FDs
+	var folder = await openStorageFolder(path, 'scandir');
+	return (await folder.getItemsAsync())
+		.map(file => file.name)
+		.sort(caseInsensitiveSort)
+});
 
-async function getList(storageFolder) {
-	return (await storageFolder.getItemsAsync())
-		.map(getNames)
-		.sort()
-}
-
-function getNames(storageFile) {
-	return storageFile.name
+function caseInsensitiveSort(a, b) {
+	a = a.toLowerCase();
+	b = b.toLowerCase();
+	if (a == b) return 0
+	if (a > b) return 1
+	return -1
 }
 
 var defaultReadStreamOptions = {
@@ -1207,13 +1317,13 @@ class FSWatcher extends EventEmitter {
 
 }
 
-async function getList$1(storageFolder) {
+async function getList(storageFolder) {
 	return (await storageFolder.getItemsAsync())
-		.map(getNames$1)
+		.map(getNames)
 		.sort()
 }
 
-function getNames$1(storageFile) {
+function getNames(storageFile) {
 	return storageFile.name
 }
 
@@ -1309,7 +1419,7 @@ function uwpPickFileSave(...args) {
 	picker.viewMode = Windows.Storage.Pickers.PickerViewMode[viewMode];
 }
 
-var _internals = {getPathFromURL};
+var _internals = {getPathFromURL, installFolder, dataFolder};
 
 
 // TODO
@@ -1326,8 +1436,12 @@ exports.open = open;
 exports.close = close;
 exports.read = read;
 exports.stat = stat;
+exports.unlink = unlink;
+exports.rmdir = rmdir;
+exports.mkdir = mkdir;
 exports.exists = exists;
 exports.uwpSetCwdFolder = uwpSetCwdFolder;
+exports.uwpSetCwd = uwpSetCwd;
 exports.readdir = readdir;
 exports.readFile = readFile;
 exports.writeFile = writeFile;

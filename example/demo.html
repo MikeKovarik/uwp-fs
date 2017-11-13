@@ -1,26 +1,95 @@
 ﻿<!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8" />
-    <title>uwp_fs</title>
-    <link href="css/default.css" rel="stylesheet" />
+	<meta charset="utf-8" />
+	<title>uwp-fs</title>
+	<style>
+		* {
+			box-sizing: border-box;
+		}
+		body {
+			padding: 1rem;
+			font-size: 14px;
+			font-family: Segoe UI;
+			overflow-y: auto;
+		}
+		h1 {
+			margin-top: 0;
+			margin-bottom: 0.5rem;
+			font-weight: 300;
+		}
+		* + h1 {
+			margin-top: 1rem
+		}
+		p {
+			margin:  0.5rem 0;
+		}
+		[layout] {
+			display: flex;
+		}
+		[flex] {
+			flex: 1;
+		}
+		[layout] > * + * {
+			margin-left: 1rem
+		}
+		pre {
+			margin: 0;
+			border: 1px solid #ddd;
+			white-space: pre-wrap;
+		}
+	</style>
 </head>
 <body>
-    
-    <div>Content goes here!</div>
+	
+	<h1>Prerequisite</h1>
 
-    <button>read file</button>
-    <button id="request-folder">request folder</button>
+	<p>All Windows UWP applications begin restricted and can only access <code id="installedLocation"></code> (read) and <code id="localFolder"></code> (read and write)</p>
 
-    <pre></pre>
-    
-    <script src="../node_modules_bundled/node-globals-shim.js"></script>
-    <script src="../node_modules_bundled/events.js"></script>
-    <script src="../node_modules_bundled/buffer.js"></script>
-    <script src="../node_modules_bundled/util.js"></script>
-    <script src="../node_modules_bundled/stream.js"></script>
-    <script src="../index.js"></script>
-    <script src="./demo.js"></script>
+	<p>To gain access to the whole filesystem, you have to first ask user to give you permissions to access <code>C:\</code> or sub/directory that is sufficient for your app. This is done by opening a FilePicker and letting user select folder (or the whole drive)</p>
+
+	<button id="request-access">request access to directory</button>
+
+	<p>This only has to be done once. <code>uwp-fs</code> then stores these folders for you in <code>AccessCache.StorageApplicationPermissions.futureAccessList</code> for future access.</p>
+
+
+	<h1>The Demo</h1>
+
+	<div layout>
+
+		<div flex>
+
+			<div layout>
+				<input type="text" id="readFile-path" flex>
+				<button id="readFile">fs.readFile()</button>
+			</div>
+
+			<br>
+
+			<div layout>
+				<input type="text" id="readdir-path" flex>
+				<button id="readdir">fs.readdir()</button>
+			</div>
+
+			<p><code>./</code> of the app points to <code></code> (warning: you only have read permissions no matter if user gives you access to <code>C:\</code> or not)</p>
+
+			<p>You can access it through non-standard <code>fs.cwd</code> and change it with <code>fs.uwpSetCwd</code></p>
+
+			<p>These non-standard APIs will hopefuly change in the future. I'm currently investigating a non conflicting way of hooking into <code>process.cwd</code> and <code>process.chdir()</code> which may be defined by another module.</p>
+		</div>
+
+		<pre flex id="log"></pre>
+
+	</div>
+
+	<script src="../node_modules_bundled/node-globals-shim.js"></script>
+	<script src="../node_modules_bundled/events.js"></script>
+	<script src="../node_modules_bundled/buffer.js"></script>
+	<script src="../node_modules_bundled/util.js"></script>
+	<script src="../node_modules_bundled/stream.js"></script>
+	<script src="../index.js"></script>
+
+	<script src="./demo.js"></script>
 
 </body>
 </html>
