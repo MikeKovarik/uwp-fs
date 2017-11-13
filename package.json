@@ -1,6 +1,6 @@
 {
   "name": "uwp-fs",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Node's `fs` module for Windows UWP apps. Wrapper of `Windows.Storage` APIs.",
   "scripts": {
     "build": "rollup -c",
