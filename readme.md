@@ -6,7 +6,7 @@ Windows 10 allows you to write native UWP (Windows store) apps with HTML and Jav
 
 The `Windows.Storage` APIs are hostile and even a simple file-reading can turn into tens of lines of code. That's why this project tries to wrap that into a nice and simple Node.js style `fs` API where you can read the file with just a `fs.readFile('path', (err, data) => console.log(data))` ;). Plus we've got Promises!
 
-`uwp-fs` tries to be 1:1 drop in replacement for `fs`, with all the errors, like `ENOENT`, you've come to love :D
+`uwp-fs` tries to be 1:1 drop in replacement for `fs`, with all the correct errors, like `ENOENT`, you've come to love :D. Except for synchronous methods. Those are unsupported in UWP.
 
 **Work in progress**, contributions welcomed.
 
@@ -66,59 +66,59 @@ Or you can give bundling it yourself a shot. Main file is at `uwp-fs/index.mjs`.
 
 ### Example
 
-
+See `example/demo.html`, `example/demo.js` and try it yourself by building `uwp-fs.sln` in Visual Studio.
 
 ## Supported APIs
 
-Work in progress.
+**Work in progress.**
 
 Most of the groundwork for reading is laid. `open`, `read` and `close` syscalls are emulated, enabling `fs.readFile`, `fs.readdir`. Streams and writing is on the way.
 
-* [ ] fs.FSWatcher *Work in progress*
-* [ ] fs.ReadStream *Work in progress*
-* [ ] fs.WriteStream
+* [ ] `fs.FSWatcher` *postponed. Initial implementation reveals unreliability of UWP's APIs*
+* [ ] `fs.ReadStream` *Work in progress*
+* [ ] `fs.WriteStream`
 
-* [ ] fs.access
-* [ ] fs.appendFile
-* [ ] fs.chmod
-* [ ] fs.chown
-* [x] fs.close *Work in progress*
-* [ ] fs.constants
-* [ ] fs.copyFile
-* [ ] fs.createReadStream *Work in progress*
-* [ ] fs.createWriteStream
-* [x] fs.exists *deprecated*
-* [ ] fs.fchmod
-* [ ] fs.fchown
-* [ ] fs.fdatasync
-* [ ] fs.fstat
-* [ ] fs.fsync
-* [ ] fs.ftruncate
-* [ ] fs.futimes
-* [ ] fs.lchmod
-* [ ] fs.lchown
-* [ ] fs.link
-* [ ] fs.lstat
-* [x] fs.mkdir
-* [ ] fs.mkdtemp
-* [x] fs.open *TODO: flags other than 'r'*
-* [x] fs.read
-* [x] fs.readdir
-* [x] fs.readFile
-* [ ] fs.readlink
-* [ ] fs.realpath
-* [ ] fs.rename
-* [x] fs.rmdir
-* [x] fs.stat *only contains size, file/folder type and times*
-* [ ] fs.symlink
-* [ ] fs.truncate
-* [x] fs.unlink
-* [ ] fs.unwatchFile
-* [ ] fs.utimes
-* [ ] fs.watch *postponed. Initial implementation reveals unreliability of UWP's APIs*
-* [ ] fs.watchFile
-* [ ] fs.write *Work in progress*
-* [ ] fs.writeFile *Work in progress*
+* [ ] `fs.access`
+* [ ] `fs.appendFile`
+* [ ] `fs.chmod`
+* [ ] `fs.chown`
+* [x] `fs.close` - *Work in progress*
+* [ ] `fs.constants`
+* [ ] `fs.copyFile`
+* [ ] `fs.createReadStream` - *Work in progress*
+* [ ] `fs.createWriteStream`
+* [x] `fs.exists` - *deprecated*
+* [ ] `fs.fchmod`
+* [ ] `fs.fchown`
+* [ ] `fs.fdatasync`
+* [ ] `fs.fstat`
+* [ ] `fs.fsync`
+* [ ] `fs.ftruncate`
+* [ ] `fs.futimes`
+* [ ] `fs.lchmod`
+* [ ] `fs.lchown`
+* [ ] `fs.link`
+* [ ] `fs.lstat`
+* [x] `fs.mkdir`
+* [ ] `fs.mkdtemp`
+* [x] `fs.open` - *TODO: flags other than 'r'*
+* [x] `fs.read`
+* [x] `fs.readdir`
+* [x] `fs.readFile`
+* [ ] `fs.readlink`
+* [ ] `fs.realpath`
+* [ ] `fs.rename`
+* [x] `fs.rmdir`
+* [x] `fs.stat` - *only contains size, file/folder type and times*
+* [ ] `fs.symlink`
+* [ ] `fs.truncate`
+* [x] `fs.unlink`
+* [ ] `fs.unwatchFile`
+* [ ] `fs.utimes`
+* [ ] `fs.watch` - *postponed. Initial implementation reveals unreliability of UWP's APIs*
+* [ ] `fs.watchFile`
+* [ ] `fs.write` - *Work in progress*
+* [ ] `fs.writeFile` - *Work in progress*
 
 ## Caveats
 

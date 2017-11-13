@@ -2,13 +2,7 @@ if (typeof process === 'undefined')
 	var process = {}
 
 if (typeof process.nextTick === 'undefined')
-	//process.nextTick = (fn, ...args) => setTimeout(() => fn(...args))
-	process.nextTick = (fn, ...args) => {
-		console.log('nextTick')
-		console.log('fn', fn)
-		console.log('args', args)
-		setTimeout(() => fn(...args))
-	}
+	process.nextTick = (fn, ...args) => setTimeout(() => fn(...args))
 
 export var isUwp = typeof Windows !== 'undefined'
 

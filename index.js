@@ -11,13 +11,7 @@ if (typeof process$1 === 'undefined')
 	var process$1 = {};
 
 if (typeof process$1.nextTick === 'undefined')
-	//process.nextTick = (fn, ...args) => setTimeout(() => fn(...args))
-	process$1.nextTick = (fn, ...args) => {
-		console.log('nextTick');
-		console.log('fn', fn);
-		console.log('args', args);
-		setTimeout(() => fn(...args));
-	};
+	process$1.nextTick = (fn, ...args) => setTimeout(() => fn(...args));
 
 var isUwp = typeof Windows !== 'undefined';
 
@@ -1349,6 +1343,9 @@ function handleError(val, callback) {
 	}
 	return false
 }
+
+// TODO: error codes
+// https://nodejs.org/api/errors.html#errors_common_system_errors
 
 if (isUwp) {
 	var {Pickers, AccessCache: AccessCache$1} = Windows.Storage;
