@@ -244,17 +244,33 @@ describe('.exists', () => {
 
 })
 
-/*
+
 
 describe('.unlink', () => {
 
-	it(`file`, async () => fs.unlink('fixtures/to-be-deleted.zip'))
-	it(`folder`, async () => fs.unlink('folder-to-delete'))
-	it(`non existing file`, async () => fs.unlink('fixtures/not-existing-file.txt'))
-	it(`non existing folder`, async () => fs.unlink('fixtures/not-existing-foler'))
+	it(`file`, async () => {
+		var path = 'fixtures/to-be-deleted.zip'
+		await ensureFile(path)
+		return [await fs.unlink(path), await exists(path)]
+	})
+	it(`folder`, async () => {
+		var path = 'fixtures/folder-to-delete'
+		await ensureFolder(path)
+		return [await fs.unlink(path), await exists(path)]
+	})
+	it(`non existing file`, async () => {
+		var path = 'fixtures/not-existing-file.txt'
+		await ensureDeleted(path)
+		return [await fs.unlink(path), await exists(path)]
+	})
+	it(`non existing folder`, async () => {
+		var path = 'fixtures/not-existing-foler'
+		await ensureDeleted(path)
+		return [await fs.unlink(path), await exists(path)]
+	})
 
 })
-*/
+
 
 
 

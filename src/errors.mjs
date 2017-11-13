@@ -52,6 +52,11 @@ export var ERROR = {
 		code: 'EEXIST',
 		description: 'file already exists'
 	},
+	EPERM:  {
+		errno: -4048, // 50
+		code: 'EPERM',
+		description: 'operation not permitted'
+	},
 	ENOTEMPTY: {
 		errno: -4051, // 53
 		code: 'ENOTEMPTY',

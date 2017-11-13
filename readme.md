@@ -39,20 +39,20 @@ Most of the groundwork is laid with emulated `open`, `read` and `close` syscalls
 * [ ] fs.lchown
 * [ ] fs.link
 * [ ] fs.lstat
-* [ ] fs.mkdir *Work in progress*
+* [x] fs.mkdir
 * [ ] fs.mkdtemp
 * [x] fs.open *TODO: flags other than 'r'*
 * [x] fs.read
-* [ ] fs.readdir *Work in progress*
+* [x] fs.readdir
 * [x] fs.readFile
 * [ ] fs.readlink
 * [ ] fs.realpath
 * [ ] fs.rename
-* [ ] fs.rmdir
-* [ ] fs.stat
+* [x] fs.rmdir
+* [x] fs.stat *only contains size, file/folder type and times*
 * [ ] fs.symlink
 * [ ] fs.truncate
-* [ ] fs.unlink *Work in progress*
+* [x] fs.unlink
 * [ ] fs.unwatchFile
 * [ ] fs.utimes
 * [ ] fs.watch *Work in progress. Initial implementation reveals unreliability of UWP's APIs*
@@ -67,3 +67,9 @@ Encodings are not part of `uwp-fs`. Those are implemented in `buffer` module and
 Please try to use most recent versions of `buffer` and `stream` modules. `uwp-fs` is built on top of latest APIs (and breaking changes) introduced in Node versions 6 (`Buffer.alloc()`, `Buffer.allocUnsafe()`) and Node 8 (`.destroy()` method on streams).
 
 _None of the __*Sync__ (readFileSync, writeFileSync, etc...) APIs are available because UWP does not suppor synchronous file system operations._
+
+APIs that involve symlinks (`fstat`, `lstat`, `stat`, ...) were not properly explored and tested yet. 
+
+## Testing
+
+Testing is done comparatively by running the same tests in both UWP and Node. Log from Node results is saved and UWP is then tested against it. `mouka` module is used to that. `mouka` uses similar API to `mocha` but allows storing test results and then importing and using them for comparison.

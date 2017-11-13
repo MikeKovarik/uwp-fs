@@ -143,7 +143,9 @@ export var unlink = callbackify(async path => {
 	nullCheck(path)
 	// Access UWP's StorageFile object
 	// Note: Not wrapped in try/catching because openStorageObject() returns sanitized Node-like error object.
-	var storageObject = await openStorageFile(path, 'stat')
+	var storageObject = await openStorageObject(path, 'unlink')
+	if (storageObject.constructor === StorageFolder)
+		throw syscallException('EPERM', 'unlink', path)
 	await storageObject.deleteAsync()
 })
 
